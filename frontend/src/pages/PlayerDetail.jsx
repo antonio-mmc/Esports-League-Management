@@ -458,7 +458,9 @@ export default function PlayerDetail() {
             <h2 className="font-display text-xs text-text-muted uppercase tracking-widest">Tournament History</h2>
           </div>
           <div className="space-y-2">
-            {teamDetail.tournaments.map(t => (
+            {[...teamDetail.tournaments]
+              .sort((a, b) => new Date(b.startDate || 0) - new Date(a.startDate || 0))
+              .map(t => (
               <div key={t.id}
                 className="flex items-center justify-between px-4 py-3 rounded-lg bg-bg-primary border border-bg-border hover:border-text-dim transition-colors duration-150">
                 <div>
@@ -492,7 +494,12 @@ export default function PlayerDetail() {
           className="glass-card p-4 shadow-xl">
           {player.achievements?.length > 0 ? (
             <div className="space-y-2.5">
-              {player.achievements.map((a, i) => (
+              {[...player.achievements]
+                .sort((a, b) => {
+                  const yr = s => parseInt(s.match(/\d{4}/)?.[0] || '0')
+                  return yr(b) - yr(a)
+                })
+                .map((a, i) => (
                 <div key={i} className="flex items-start gap-2.5">
                   <Trophy size={12} className="text-yellow-400 flex-shrink-0 mt-0.5" />
                   <span className="font-body text-sm text-text-primary">{a}</span>

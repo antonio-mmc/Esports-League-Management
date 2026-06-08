@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -101,7 +103,8 @@ public class DataInitializer implements CommandLineRunner {
             boolean efbMissing      = playerRepo.findAll().stream().anyMatch(p -> p instanceof EFootballPlayer efb && efb.getBallRecoveries() == null);
             boolean racingMissing   = playerRepo.findAll().stream().noneMatch(p -> p instanceof RacingPlayer);
             boolean brMissing       = playerRepo.findAll().stream().noneMatch(p -> p instanceof BattleRoyalePlayer);
-            if (!playersMissing && !tourneysMissing && !fpsMissing && !efbMissing && !racingMissing && !brMissing) return;
+            boolean historyMissing  = tournamentRepo.findAll().stream().noneMatch(t -> "COMPLETED".equals(t.getStatus()));
+            if (!playersMissing && !tourneysMissing && !fpsMissing && !efbMissing && !racingMissing && !brMissing && !historyMissing) return;
 
             if (playersMissing) {
                 playerRepo.findAll().forEach(p -> {
@@ -143,6 +146,7 @@ public class DataInitializer implements CommandLineRunner {
 
             if (racingMissing) seedRacing();
             if (brMissing)     seedBattleRoyale();
+            if (historyMissing) seedHistory();
 
             return;
         }
@@ -236,6 +240,7 @@ public class DataInitializer implements CommandLineRunner {
 
         seedRacing();
         seedBattleRoyale();
+        seedHistory();
     }
 
     // ── Racing seed ────────────────────────────────────────────────────────────
@@ -409,6 +414,280 @@ public class DataInitializer implements CommandLineRunner {
 
     private Match upcoming(Team a, Team b, String date, Tournament t) {
         return new Match(a, b, LocalDate.parse(date), t);
+    }
+
+    // ── History seed (past tournaments, matches, achievements, career stats) ──
+
+    private void seedHistory() {
+        Map<String, Team>   t = new HashMap<>();
+        Map<String, Player> p = new HashMap<>();
+        teamRepo.findAll().forEach(x   -> t.put(x.getName(),     x));
+        playerRepo.findAll().forEach(x -> p.put(x.getNickname(), x));
+        if (t.isEmpty()) return;
+
+        Team nexus     = t.get("Team Nexus");
+        Team storm     = t.get("Storm Raiders");
+        Team phantom   = t.get("Phantom Squad");
+        Team iron      = t.get("Iron Wolves");
+        Team echo      = t.get("Echo Strike");
+        Team apex      = t.get("Apex Horizon");
+        Team velocity  = t.get("Velocity Grid");
+        Team nitro     = t.get("Nitro Kings");
+        Team dropZone  = t.get("Drop Zone");
+        Team zoneCtrl  = t.get("Zone Control");
+
+        // ── PAST FPS ──────────────────────────────────────────────────────────
+        // Valorant Champions 2025: Phantom wins, Nexus 2nd, Storm 3rd
+        Tournament vc2025 = tournament("Valorant Champions 2025", "FPS", "COMPLETED", "2025-01-15", nexus, storm, phantom);
+        tournamentRepo.save(vc2025);
+        matchRepo.saveAll(List.of(
+            played(phantom, storm,  "2025-01-18", vc2025, 13,  7),
+            played(nexus,   storm,  "2025-01-20", vc2025, 13,  9),
+            played(phantom, nexus,  "2025-01-22", vc2025, 13, 10),
+            played(phantom, nexus,  "2025-01-25", vc2025, 13,  9)   // FINAL
+        ));
+
+        // Valorant World Cup 2024: Nexus wins, Phantom 2nd, Storm 3rd
+        Tournament vwc2024 = tournament("Valorant World Cup 2024", "FPS", "COMPLETED", "2024-05-01", nexus, storm, phantom);
+        tournamentRepo.save(vwc2024);
+        matchRepo.saveAll(List.of(
+            played(nexus,   storm,   "2024-05-05", vwc2024, 13,  9),
+            played(phantom, storm,   "2024-05-07", vwc2024, 13,  8),
+            played(nexus,   phantom, "2024-05-09", vwc2024, 13, 11),
+            played(nexus,   phantom, "2024-05-12", vwc2024, 13,  8)  // FINAL
+        ));
+
+        // ── PAST MOBA ─────────────────────────────────────────────────────────
+        // LoL Spring Championship 2025: Echo wins, Iron 2nd, Nexus 3rd
+        Tournament lsc2025 = tournament("LoL Spring Championship 2025", "MOBA", "COMPLETED", "2025-02-01", iron, echo, nexus);
+        tournamentRepo.save(lsc2025);
+        matchRepo.saveAll(List.of(
+            played(echo,  iron,  "2025-02-05", lsc2025, 28, 15),
+            played(nexus, iron,  "2025-02-07", lsc2025, 22, 19),
+            played(echo,  nexus, "2025-02-09", lsc2025, 31, 18),
+            played(echo,  iron,  "2025-02-12", lsc2025, 30, 21)      // FINAL
+        ));
+
+        // LoL Pro League 2024: Iron wins, Echo 2nd (best-of-5 tiebreak)
+        Tournament lpl2024 = tournament("LoL Pro League 2024", "MOBA", "COMPLETED", "2024-03-15", iron, echo);
+        tournamentRepo.save(lpl2024);
+        matchRepo.saveAll(List.of(
+            played(iron, echo, "2024-03-18", lpl2024, 25, 17),
+            played(echo, iron, "2024-03-22", lpl2024, 28, 24),
+            played(iron, echo, "2024-03-25", lpl2024, 29, 22),
+            played(echo, iron, "2024-03-28", lpl2024, 26, 23),
+            played(iron, echo, "2024-03-31", lpl2024, 31, 24)        // FINAL G5
+        ));
+
+        // ── PAST eFOOTBALL ────────────────────────────────────────────────────
+        // FIFA World Cup Sim 2025: Apex wins, Storm 2nd
+        Tournament fwcs2025 = tournament("FIFA World Cup Sim 2025", "eFootball", "COMPLETED", "2025-01-20", apex, storm);
+        tournamentRepo.save(fwcs2025);
+        matchRepo.saveAll(List.of(
+            played(apex,  storm, "2025-01-22", fwcs2025, 3, 1),
+            played(storm, apex,  "2025-01-24", fwcs2025, 2, 1),
+            played(apex,  storm, "2025-01-26", fwcs2025, 2, 0)       // FINAL: apex wins
+        ));
+
+        // FIFA eLeague 2024: Storm wins, Apex 2nd (best-of-5)
+        Tournament fel2024 = tournament("FIFA eLeague 2024", "eFootball", "COMPLETED", "2024-06-01", apex, storm);
+        tournamentRepo.save(fel2024);
+        matchRepo.saveAll(List.of(
+            played(storm, apex,  "2024-06-05", fel2024, 2, 1),
+            played(apex,  storm, "2024-06-09", fel2024, 3, 2),
+            played(storm, apex,  "2024-06-12", fel2024, 1, 0),
+            played(apex,  storm, "2024-06-16", fel2024, 2, 0),
+            played(storm, apex,  "2024-06-19", fel2024, 2, 1)        // FINAL G5: storm wins
+        ));
+
+        // ── PAST RACING ───────────────────────────────────────────────────────
+        // SimRacing World Cup 2025: Nitro wins, Velocity 2nd (3-2)
+        Tournament src2025 = tournament("SimRacing World Cup 2025", "Racing", "COMPLETED", "2025-03-01", velocity, nitro);
+        tournamentRepo.save(src2025);
+        matchRepo.saveAll(List.of(
+            played(nitro,    velocity, "2025-03-08", src2025, 38, 25),
+            played(velocity, nitro,    "2025-03-15", src2025, 31, 28),
+            played(nitro,    velocity, "2025-03-22", src2025, 40, 22),
+            played(velocity, nitro,    "2025-03-29", src2025, 33, 30),
+            played(nitro,    velocity, "2025-04-05", src2025, 37, 26) // FINAL G5: nitro wins
+        ));
+
+        // SimRacing Pro League 2024: Velocity wins, Nitro 2nd (4-2)
+        Tournament srp2024 = tournament("SimRacing Pro League 2024", "Racing", "COMPLETED", "2024-03-15", velocity, nitro);
+        tournamentRepo.save(srp2024);
+        matchRepo.saveAll(List.of(
+            played(velocity, nitro,    "2024-03-22", srp2024, 31, 24),
+            played(nitro,    velocity, "2024-03-29", srp2024, 35, 28),
+            played(velocity, nitro,    "2024-04-05", srp2024, 33, 29),
+            played(nitro,    velocity, "2024-04-12", srp2024, 32, 30),
+            played(velocity, nitro,    "2024-04-19", srp2024, 38, 31),
+            played(velocity, nitro,    "2024-04-26", srp2024, 29, 27) // velocity seals 4-2
+        ));
+
+        // ── PAST BATTLE ROYALE ────────────────────────────────────────────────
+        // BR World Series 2025: Zone Control wins, Drop Zone 2nd (3-2)
+        Tournament brws2025 = tournament("BR World Series 2025", "BattleRoyale", "COMPLETED", "2025-05-01", dropZone, zoneCtrl);
+        tournamentRepo.save(brws2025);
+        matchRepo.saveAll(List.of(
+            played(zoneCtrl, dropZone, "2025-05-08", brws2025, 49, 35),
+            played(dropZone, zoneCtrl, "2025-05-15", brws2025, 42, 36),
+            played(zoneCtrl, dropZone, "2025-05-22", brws2025, 55, 28),
+            played(dropZone, zoneCtrl, "2025-05-29", brws2025, 44, 39),
+            played(zoneCtrl, dropZone, "2025-06-05", brws2025, 51, 33) // FINAL G5: ZC wins
+        ));
+
+        // BR Nations Cup 2024: Drop Zone wins, Zone Control 2nd (3-2)
+        Tournament brnc2024 = tournament("BR Nations Cup 2024", "BattleRoyale", "COMPLETED", "2024-05-01", dropZone, zoneCtrl);
+        tournamentRepo.save(brnc2024);
+        matchRepo.saveAll(List.of(
+            played(dropZone, zoneCtrl, "2024-05-08", brnc2024, 45, 39),
+            played(zoneCtrl, dropZone, "2024-05-15", brnc2024, 48, 35),
+            played(dropZone, zoneCtrl, "2024-05-22", brnc2024, 43, 37),
+            played(zoneCtrl, dropZone, "2024-05-29", brnc2024, 50, 44),
+            played(dropZone, zoneCtrl, "2024-06-05", brnc2024, 47, 41) // FINAL G5: DZ wins
+        ));
+
+        // ── CAREER STATS (full 3-season history) ─────────────────────────────
+        // FPS — Phantom Squad (Champions 2025 + Runner-Up 2024)
+        career(p, "svenL",    42, 33,  9);
+        career(p, "nRossi",   38, 29,  9);
+        career(p, "oHassan",  36, 27,  9);
+        career(p, "cDubois",  40, 31,  9);
+        career(p, "lSantos",  37, 28,  9);
+        // FPS — Team Nexus (Champions 2024 + Runner-Up 2025)
+        career(p, "cMendes99", 43, 30, 13);
+        career(p, "xAna7",     36, 24, 12);
+        career(p, "rickF",     48, 34, 14);
+        career(p, "bLima",     32, 20, 12);
+        career(p, "dPinto",    40, 27, 13);
+        // FPS — Storm Raiders (no titles, cross-discipline with eFootball)
+        career(p, "jakeMorris", 41, 23, 18);
+        career(p, "yukiT",      46, 27, 19);
+        career(p, "elenaP",     36, 20, 16);
+        career(p, "kAsante",    43, 25, 18);
+        career(p, "mJensen",    34, 17, 17);
+        // MOBA — Echo Strike (Champions 2025 + Runner-Up 2024)
+        career(p, "lBianchi",  36, 26, 10);
+        career(p, "hKovac",    32, 22, 10);
+        career(p, "rSuzuki",   38, 28, 10);
+        career(p, "fatimaa",   30, 21,  9);
+        career(p, "dVargas",   34, 24, 10);
+        // MOBA — Iron Wolves (Champions 2024 + Runner-Up 2025)
+        career(p, "mFischer",  37, 24, 13);
+        career(p, "sKim",      41, 27, 14);
+        career(p, "pNovak",    34, 21, 13);
+        career(p, "aDiallo",   43, 29, 14);
+        career(p, "tWalsh",    30, 18, 12);
+        // eFootball — Apex Horizon (Champions 2025 + Runner-Up 2024)
+        career(p, "iBerg",     30, 22,  8);
+        career(p, "kMensah",   27, 18,  9);
+        career(p, "zAhmed",    32, 23,  9);
+        career(p, "mRuiz",     28, 20,  8);
+        career(p, "ayumiN",    25, 17,  8);
+        // Racing — Velocity Grid (Champions 2024 + Runner-Up 2025)
+        career(p, "ferriV",     22, 10, 12);
+        career(p, "sofiaSpeed", 20,  9, 11);
+        career(p, "espinozaGP", 21, 10, 11);
+        career(p, "ynouri",     19,  8, 11);
+        career(p, "pvhorn",     18,  7, 11);
+        // Racing — Nitro Kings (Champions 2025 + Runner-Up 2024)
+        career(p, "hartXX",     23, 13, 10);
+        career(p, "elinRace",   22, 12, 10);
+        career(p, "volkovGP",   21, 11, 10);
+        career(p, "kaitoV8",    20, 10, 10);
+        career(p, "aOsei_nk",   18,  8, 10);
+        // BR — Drop Zone (Champions 2024 + Runner-Up 2025)
+        career(p, "gSilva_br",  16,  7,  9);
+        career(p, "vCruz_dz",   15,  7,  8);
+        career(p, "jMoral_dz",  14,  6,  8);
+        career(p, "priyaApex",  15,  7,  8);
+        career(p, "nAdeyemi",   13,  5,  8);
+        // BR — Zone Control (Champions 2025 + Runner-Up 2024)
+        career(p, "mjLee_zc",   16,  9,  7);
+        career(p, "xWei_zc",    15,  8,  7);
+        career(p, "hinaFuji",   14,  8,  6);
+        career(p, "tRahman",    13,  7,  6);
+        career(p, "nPetrov_zc", 14,  8,  6);
+
+        // ── ACHIEVEMENTS ─────────────────────────────────────────────────────
+        // Phantom Squad — Champions 2025, Runner-Up 2024
+        achieve(p, "svenL",    "Champion — Valorant Champions 2025",  "Runner-Up — Valorant World Cup 2024",  "Tournament MVP — Valorant Champions 2025", "Most Kills — Season 2025");
+        achieve(p, "nRossi",   "Champion — Valorant Champions 2025",  "Runner-Up — Valorant World Cup 2024",  "Top Fragger — Valorant Champions 2025");
+        achieve(p, "oHassan",  "Champion — Valorant Champions 2025",  "Runner-Up — Valorant World Cup 2024");
+        achieve(p, "cDubois",  "Champion — Valorant Champions 2025",  "Runner-Up — Valorant World Cup 2024",  "Best Support Player — Season 2025");
+        achieve(p, "lSantos",  "Champion — Valorant Champions 2025",  "Runner-Up — Valorant World Cup 2024");
+        // Team Nexus — Champions 2024, Runner-Up 2025
+        achieve(p, "cMendes99","Champion — Valorant World Cup 2024",  "Runner-Up — Valorant Champions 2025",  "Best Portuguese Player — Season 2024");
+        achieve(p, "xAna7",    "Champion — Valorant World Cup 2024",  "Runner-Up — Valorant Champions 2025");
+        achieve(p, "rickF",    "Champion — Valorant World Cup 2024",  "Runner-Up — Valorant Champions 2025",  "Tournament MVP — Valorant World Cup 2024", "Top Fragger — Season 2024");
+        achieve(p, "bLima",    "Champion — Valorant World Cup 2024",  "Runner-Up — Valorant Champions 2025");
+        achieve(p, "dPinto",   "Champion — Valorant World Cup 2024",  "Runner-Up — Valorant Champions 2025");
+        // Storm Raiders — no titles (versatile cross-discipline team)
+        achieve(p, "jakeMorris","Champion — FIFA eLeague 2024",       "Top 4 — Valorant World Cup 2024",      "Top 4 — Valorant Champions 2025");
+        achieve(p, "yukiT",    "Champion — FIFA eLeague 2024",        "Top 4 — Valorant World Cup 2024",      "Top 4 — Valorant Champions 2025", "Best Individual Performance — Season 2024");
+        achieve(p, "elenaP",   "Champion — FIFA eLeague 2024",        "Top 4 — Valorant World Cup 2024");
+        achieve(p, "kAsante",  "Champion — FIFA eLeague 2024",        "Top 4 — Valorant Champions 2025");
+        achieve(p, "mJensen",  "Champion — FIFA eLeague 2024",        "Top 4 — Valorant Champions 2025");
+        // Echo Strike — Champions 2025, Runner-Up 2024
+        achieve(p, "lBianchi", "Champion — LoL Spring Championship 2025", "Runner-Up — LoL Pro League 2024");
+        achieve(p, "hKovac",   "Champion — LoL Spring Championship 2025", "Runner-Up — LoL Pro League 2024");
+        achieve(p, "rSuzuki",  "Champion — LoL Spring Championship 2025", "Runner-Up — LoL Pro League 2024",  "Tournament MVP — LoL Spring Championship 2025", "Best Jungler — Season 2025");
+        achieve(p, "fatimaa",  "Champion — LoL Spring Championship 2025", "Runner-Up — LoL Pro League 2024");
+        achieve(p, "dVargas",  "Champion — LoL Spring Championship 2025", "Runner-Up — LoL Pro League 2024");
+        // Iron Wolves — Champions 2024, Runner-Up 2025
+        achieve(p, "mFischer", "Champion — LoL Pro League 2024",      "Runner-Up — LoL Spring Championship 2025");
+        achieve(p, "sKim",     "Champion — LoL Pro League 2024",      "Runner-Up — LoL Spring Championship 2025", "Best Support Player — Season 2024");
+        achieve(p, "pNovak",   "Champion — LoL Pro League 2024",      "Runner-Up — LoL Spring Championship 2025");
+        achieve(p, "aDiallo",  "Champion — LoL Pro League 2024",      "Runner-Up — LoL Spring Championship 2025", "Most Assists — Season 2024");
+        achieve(p, "tWalsh",   "Champion — LoL Pro League 2024",      "Runner-Up — LoL Spring Championship 2025");
+        // Apex Horizon — Champions 2025, Runner-Up 2024
+        achieve(p, "iBerg",    "Champion — FIFA World Cup Sim 2025",  "Runner-Up — FIFA eLeague 2024",         "Top Scorer — Season 2025");
+        achieve(p, "kMensah",  "Champion — FIFA World Cup Sim 2025",  "Runner-Up — FIFA eLeague 2024");
+        achieve(p, "zAhmed",   "Champion — FIFA World Cup Sim 2025",  "Runner-Up — FIFA eLeague 2024",         "Best Winger — Season 2025");
+        achieve(p, "mRuiz",    "Champion — FIFA World Cup Sim 2025",  "Runner-Up — FIFA eLeague 2024",         "Best Goalkeeper — Season 2025");
+        achieve(p, "ayumiN",   "Champion — FIFA World Cup Sim 2025",  "Runner-Up — FIFA eLeague 2024");
+        // Velocity Grid — Champions 2024, Runner-Up 2025
+        achieve(p, "ferriV",     "Champion — SimRacing Pro League 2024", "Runner-Up — SimRacing World Cup 2025", "Rookie of the Year — 2024", "Fastest Lap Award — Season 2024");
+        achieve(p, "sofiaSpeed", "Champion — SimRacing Pro League 2024", "Runner-Up — SimRacing World Cup 2025");
+        achieve(p, "espinozaGP","Champion — SimRacing Pro League 2024", "Runner-Up — SimRacing World Cup 2025");
+        achieve(p, "ynouri",     "Champion — SimRacing Pro League 2024", "Runner-Up — SimRacing World Cup 2025");
+        achieve(p, "pvhorn",     "Champion — SimRacing Pro League 2024");
+        // Nitro Kings — Champions 2025, Runner-Up 2024
+        achieve(p, "hartXX",    "Champion — SimRacing World Cup 2025",  "Runner-Up — SimRacing Pro League 2024", "Tournament MVP — SimRacing World Cup 2025", "Fastest Lap Record — Season 2025");
+        achieve(p, "elinRace",  "Champion — SimRacing World Cup 2025",  "Runner-Up — SimRacing Pro League 2024");
+        achieve(p, "volkovGP",  "Champion — SimRacing World Cup 2025",  "Runner-Up — SimRacing Pro League 2024");
+        achieve(p, "kaitoV8",   "Champion — SimRacing World Cup 2025",  "Runner-Up — SimRacing Pro League 2024");
+        achieve(p, "aOsei_nk",  "Champion — SimRacing World Cup 2025");
+        // Drop Zone — Champions 2024, Runner-Up 2025
+        achieve(p, "gSilva_br", "Champion — BR Nations Cup 2024",       "Runner-Up — BR World Series 2025",     "Tournament MVP — BR Nations Cup 2024", "Highest Kill Count — Season 2024");
+        achieve(p, "vCruz_dz",  "Champion — BR Nations Cup 2024",       "Runner-Up — BR World Series 2025");
+        achieve(p, "jMoral_dz", "Champion — BR Nations Cup 2024",       "Runner-Up — BR World Series 2025");
+        achieve(p, "priyaApex", "Champion — BR Nations Cup 2024",       "Runner-Up — BR World Series 2025");
+        achieve(p, "nAdeyemi",  "Champion — BR Nations Cup 2024",       "Runner-Up — BR World Series 2025");
+        // Zone Control — Champions 2025, Runner-Up 2024
+        achieve(p, "mjLee_zc",  "Champion — BR World Series 2025",      "Runner-Up — BR Nations Cup 2024",      "Tournament MVP — BR World Series 2025", "Most Kills — Season 2025");
+        achieve(p, "xWei_zc",   "Champion — BR World Series 2025",      "Runner-Up — BR Nations Cup 2024");
+        achieve(p, "hinaFuji",  "Champion — BR World Series 2025",      "Runner-Up — BR Nations Cup 2024");
+        achieve(p, "tRahman",   "Champion — BR World Series 2025",      "Runner-Up — BR Nations Cup 2024");
+        achieve(p, "nPetrov_zc","Champion — BR World Series 2025",      "Runner-Up — BR Nations Cup 2024");
+    }
+
+    private void career(Map<String, Player> players, String nick, int mp, int w, int l) {
+        Player pl = players.get(nick);
+        if (pl == null) return;
+        pl.setMatchesPlayed(mp);
+        pl.setWins(w);
+        pl.setLosses(l);
+        playerRepo.save(pl);
+    }
+
+    private void achieve(Map<String, Player> players, String nick, String... achievements) {
+        Player pl = players.get(nick);
+        if (pl == null) return;
+        List<String> list = new ArrayList<>(pl.getAchievements() != null ? pl.getAchievements() : List.of());
+        for (String a : achievements) if (!list.contains(a)) list.add(a);
+        pl.setAchievements(list);
+        playerRepo.save(pl);
     }
 
     private RacingPlayer racing(String fullName, String nick, Team team,

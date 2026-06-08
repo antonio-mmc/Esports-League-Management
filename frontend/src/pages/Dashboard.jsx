@@ -69,8 +69,10 @@ export default function Dashboard() {
     tournaments
       .filter(t => matchesGame(t.game, gameFilter))
       .sort((a, b) => {
-        const order = { ACTIVE: 0, UPCOMING: 1, PENDING: 1, FINISHED: 2 }
-        return (order[a.status] ?? 3) - (order[b.status] ?? 3)
+        const order = { ACTIVE: 0, UPCOMING: 1, PENDING: 1, COMPLETED: 2, FINISHED: 2 }
+        const sd = (order[a.status] ?? 3) - (order[b.status] ?? 3)
+        if (sd !== 0) return sd
+        return new Date(b.startDate || 0) - new Date(a.startDate || 0)
       }),
   [tournaments, gameFilter])
 
@@ -345,7 +347,7 @@ export default function Dashboard() {
                     <p className="text-sm text-text-dim font-body text-center py-8">No tournaments yet.</p>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {filteredTournaments.map(t => (
+                      {filteredTournaments.slice(0, 6).map(t => (
                         <Link key={t.id} to={`/tournaments/${t.id}`}
                           className="flex items-center gap-3 px-4 py-3 rounded-xl border border-bg-border hover:border-accent-purple/30 hover:bg-bg-primary transition-all duration-150 group cursor-pointer">
                           <div className="w-9 h-9 rounded-lg bg-accent-purple/10 flex items-center justify-center flex-shrink-0"
@@ -469,7 +471,7 @@ export default function Dashboard() {
                   <p className="text-sm text-text-dim font-body text-center py-8">No tournaments for this mode yet.</p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {filteredTournaments.map(t => (
+                    {filteredTournaments.slice(0, 6).map(t => (
                       <Link key={t.id} to={`/tournaments/${t.id}`}
                         className="flex items-center gap-3 px-4 py-3 rounded-xl border border-bg-border hover:border-accent-purple/30 hover:bg-bg-primary transition-all duration-150 group cursor-pointer">
                         <div className="w-9 h-9 rounded-lg bg-accent-purple/10 flex items-center justify-center flex-shrink-0"

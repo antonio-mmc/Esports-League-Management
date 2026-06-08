@@ -102,6 +102,8 @@ const emptyForm = {
   accuracy: 0, headshots: 0, kast: 0, adr: 0,
   mainCharacter: '', kills: 0, deaths: 0, mobaAssists: 0,
   mainPosition: '', goalsScored: 0, goalsSaved: 0, efbAssists: 0, shotsOnTarget: 0, ballRecoveries: 0,
+  avgPosition: 0, podiums: 0, fastestLaps: 0, dnf: 0,
+  avgPlacement: 0, top10Rate: 0, damagePerMatch: 0,
 }
 
 function buildPayload(form) {
@@ -119,9 +121,11 @@ function buildPayload(form) {
     achievements,
     ...(form.teamId ? { team: { id: Number(form.teamId) } } : {}),
   }
-  if (form.playerType === 'FPS')       return { ...base, accuracy: Number(form.accuracy), headshots: Number(form.headshots), kast: Number(form.kast), adr: Number(form.adr) }
-  if (form.playerType === 'MOBA')      return { ...base, mainCharacter: form.mainCharacter, kills: Number(form.kills), deaths: Number(form.deaths), mobaAssists: Number(form.mobaAssists) }
-  if (form.playerType === 'EFOOTBALL') return { ...base, mainPosition: form.mainPosition, goalsScored: Number(form.goalsScored), goalsSaved: Number(form.goalsSaved), efbAssists: Number(form.efbAssists), shotsOnTarget: Number(form.shotsOnTarget), ballRecoveries: Number(form.ballRecoveries) }
+  if (form.playerType === 'FPS')          return { ...base, accuracy: Number(form.accuracy), headshots: Number(form.headshots), kast: Number(form.kast), adr: Number(form.adr) }
+  if (form.playerType === 'MOBA')         return { ...base, mainCharacter: form.mainCharacter, kills: Number(form.kills), deaths: Number(form.deaths), mobaAssists: Number(form.mobaAssists) }
+  if (form.playerType === 'EFOOTBALL')    return { ...base, mainPosition: form.mainPosition, goalsScored: Number(form.goalsScored), goalsSaved: Number(form.goalsSaved), efbAssists: Number(form.efbAssists), shotsOnTarget: Number(form.shotsOnTarget), ballRecoveries: Number(form.ballRecoveries) }
+  if (form.playerType === 'RACING')       return { ...base, avgPosition: Number(form.avgPosition), podiums: Number(form.podiums), fastestLaps: Number(form.fastestLaps), dnf: Number(form.dnf) }
+  if (form.playerType === 'BATTLE_ROYALE')return { ...base, avgPlacement: Number(form.avgPlacement), kills: Number(form.kills), top10Rate: Number(form.top10Rate), damagePerMatch: Number(form.damagePerMatch) }
   return base
 }
 
@@ -192,6 +196,8 @@ export default function Players() {
       accuracy: p.accuracy || 0, headshots: p.headshots || 0, kast: p.kast || 0, adr: p.adr || 0,
       mainCharacter: p.mainCharacter || '', kills: p.kills || 0, deaths: p.deaths || 0, mobaAssists: p.mobaAssists || 0,
       mainPosition: p.mainPosition || '', goalsScored: p.goalsScored || 0, goalsSaved: p.goalsSaved || 0, efbAssists: p.efbAssists || 0, shotsOnTarget: p.shotsOnTarget || 0, ballRecoveries: p.ballRecoveries || 0,
+      avgPosition: p.avgPosition || 0, podiums: p.podiums || 0, fastestLaps: p.fastestLaps || 0, dnf: p.dnf || 0,
+      avgPlacement: p.avgPlacement || 0, top10Rate: p.top10Rate || 0, damagePerMatch: p.damagePerMatch || 0,
     })
     setModal(true)
   }
@@ -496,6 +502,39 @@ export default function Players() {
               </Field>
               <Field label="Ball Recoveries">
                 <input type="number" className="input-field" value={form.ballRecoveries} onChange={e => set('ballRecoveries', e.target.value)} min="0" />
+              </Field>
+            </div>
+          )}
+
+          {form.playerType === 'RACING' && (
+            <div className="grid grid-cols-4 gap-3 pt-2 border-t border-bg-border">
+              <Field label="Avg Position">
+                <input type="number" step="0.1" className="input-field" value={form.avgPosition} onChange={e => set('avgPosition', e.target.value)} min="1" placeholder="2.3" />
+              </Field>
+              <Field label="Podiums">
+                <input type="number" className="input-field" value={form.podiums} onChange={e => set('podiums', e.target.value)} min="0" />
+              </Field>
+              <Field label="Fastest Laps">
+                <input type="number" className="input-field" value={form.fastestLaps} onChange={e => set('fastestLaps', e.target.value)} min="0" />
+              </Field>
+              <Field label="DNFs">
+                <input type="number" className="input-field" value={form.dnf} onChange={e => set('dnf', e.target.value)} min="0" />
+              </Field>
+            </div>
+          )}
+          {form.playerType === 'BATTLE_ROYALE' && (
+            <div className="grid grid-cols-4 gap-3 pt-2 border-t border-bg-border">
+              <Field label="Avg Placement">
+                <input type="number" step="0.1" className="input-field" value={form.avgPlacement} onChange={e => set('avgPlacement', e.target.value)} min="1" placeholder="3.2" />
+              </Field>
+              <Field label="Total Kills">
+                <input type="number" className="input-field" value={form.kills} onChange={e => set('kills', e.target.value)} min="0" />
+              </Field>
+              <Field label="Top-10 Rate (%)">
+                <input type="number" step="0.1" className="input-field" value={form.top10Rate} onChange={e => set('top10Rate', e.target.value)} min="0" max="100" placeholder="78.4" />
+              </Field>
+              <Field label="Damage / Match">
+                <input type="number" step="0.1" className="input-field" value={form.damagePerMatch} onChange={e => set('damagePerMatch', e.target.value)} min="0" placeholder="892" />
               </Field>
             </div>
           )}
