@@ -27,11 +27,15 @@ public class PlayerService {
     public List<Player> findByType(String type) {
         return playerRepository.findAll().stream()
             .filter(p -> switch (type.toUpperCase()) {
-                case "FPS"       -> p instanceof FPSPlayer;
-                case "MOBA"      -> p instanceof MOBAPlayer;
-                case "EFOOTBALL" -> p instanceof EFootballPlayer;
-                case "GENERIC"   -> !(p instanceof FPSPlayer) && !(p instanceof MOBAPlayer) && !(p instanceof EFootballPlayer);
-                default          -> true;
+                case "FPS"          -> p instanceof FPSPlayer;
+                case "MOBA"         -> p instanceof MOBAPlayer;
+                case "EFOOTBALL"    -> p instanceof EFootballPlayer;
+                case "RACING"       -> p instanceof RacingPlayer;
+                case "BATTLE_ROYALE"-> p instanceof BattleRoyalePlayer;
+                case "GENERIC"      -> !(p instanceof FPSPlayer) && !(p instanceof MOBAPlayer)
+                                    && !(p instanceof EFootballPlayer) && !(p instanceof RacingPlayer)
+                                    && !(p instanceof BattleRoyalePlayer);
+                default             -> true;
             })
             .toList();
     }
@@ -56,6 +60,10 @@ public class PlayerService {
         player.setMatchesPlayed(updated.getMatchesPlayed());
         player.setWins(updated.getWins());
         player.setLosses(updated.getLosses());
+        player.setBirthDate(updated.getBirthDate());
+        player.setNationality(updated.getNationality());
+        player.setCity(updated.getCity());
+        player.setAchievements(updated.getAchievements());
         if (updated.getPassword() != null && !updated.getPassword().isBlank()) {
             player.setPassword(updated.getPassword());
         }
@@ -63,6 +71,8 @@ public class PlayerService {
         if (player instanceof FPSPlayer fps && updated instanceof FPSPlayer upd) {
             fps.setAccuracy(upd.getAccuracy());
             fps.setHeadshots(upd.getHeadshots());
+            fps.setKast(upd.getKast());
+            fps.setAdr(upd.getAdr());
         } else if (player instanceof MOBAPlayer moba && updated instanceof MOBAPlayer upd) {
             moba.setMainCharacter(upd.getMainCharacter());
             moba.setKills(upd.getKills());
@@ -73,6 +83,18 @@ public class PlayerService {
             ef.setGoalsScored(upd.getGoalsScored());
             ef.setGoalsSaved(upd.getGoalsSaved());
             ef.setEfbAssists(upd.getEfbAssists());
+            ef.setShotsOnTarget(upd.getShotsOnTarget());
+            ef.setBallRecoveries(upd.getBallRecoveries());
+        } else if (player instanceof RacingPlayer rp && updated instanceof RacingPlayer upd) {
+            rp.setAvgPosition(upd.getAvgPosition());
+            rp.setPodiums(upd.getPodiums());
+            rp.setFastestLaps(upd.getFastestLaps());
+            rp.setDnf(upd.getDnf());
+        } else if (player instanceof BattleRoyalePlayer br && updated instanceof BattleRoyalePlayer upd) {
+            br.setAvgPlacement(upd.getAvgPlacement());
+            br.setKills(upd.getKills());
+            br.setTop10Rate(upd.getTop10Rate());
+            br.setDamagePerMatch(upd.getDamagePerMatch());
         }
 
         return playerRepository.save(player);

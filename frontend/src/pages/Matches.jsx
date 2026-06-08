@@ -16,8 +16,8 @@ function Field({ label, children }) {
   )
 }
 
-const emptyForm    = { teamAId: '', teamBId: '', date: '', tournamentId: '' }
-const emptyResult  = { scoreA: 0, scoreB: 0 }
+const emptyForm   = { teamAId: '', teamBId: '', date: '', tournamentId: '' }
+const emptyResult = { scoreA: 0, scoreB: 0 }
 
 export default function Matches() {
   const [matches, setMatches]         = useState([])
@@ -55,7 +55,7 @@ export default function Matches() {
 
   const handleSchedule = async () => {
     if (!form.teamAId || !form.teamBId || !form.date || !form.tournamentId) {
-      alert('Preenche todos os campos obrigatórios.')
+      alert('Please fill in all required fields.')
       return
     }
     setSaving(true)
@@ -67,9 +67,9 @@ export default function Matches() {
         date:         form.date,
       })
       setModal(false)
-      toast('Partida agendada com sucesso.', 'success')
+      toast('Match scheduled successfully.', 'success')
       load()
-    } catch (e) { toast(e?.response?.data?.message || 'Erro ao agendar partida.', 'error') }
+    } catch (e) { toast(e?.response?.data?.message || 'Failed to schedule match.', 'error') }
     finally { setSaving(false) }
   }
 
@@ -78,19 +78,19 @@ export default function Matches() {
     try {
       await matchApi.recordResult(selectedMatch.id, Number(result.scoreA), Number(result.scoreB))
       setResultModal(false)
-      toast('Resultado registado.', 'success')
+      toast('Result recorded.', 'success')
       load()
-    } catch (e) { toast(e?.response?.data?.message || 'Erro ao registar resultado.', 'error') }
+    } catch (e) { toast(e?.response?.data?.message || 'Failed to record result.', 'error') }
     finally { setSaving(false) }
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Eliminar partida?')) return
+    if (!confirm('Delete match?')) return
     try {
       await matchApi.delete(id)
-      toast('Partida eliminada.', 'info')
+      toast('Match deleted.', 'info')
       load()
-    } catch(e) { toast(e?.response?.data?.message || 'Erro ao eliminar.', 'error') }
+    } catch(e) { toast(e?.response?.data?.message || 'Failed to delete.', 'error') }
   }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -99,11 +99,11 @@ export default function Matches() {
     if (!m.resultRecorded) return null
     if (m.teamAScore > m.teamBScore) return m.teamA?.name
     if (m.teamBScore > m.teamAScore) return m.teamB?.name
-    return 'Empate'
+    return 'Draw'
   }
 
   const columns = [
-    { key: 'teamA', label: 'Equipa A', render: v => (
+    { key: 'teamA', label: 'Team A', render: v => (
       <div className="flex items-center gap-2">
         <div className="w-6 h-6 rounded bg-accent-blue/10 flex items-center justify-center flex-shrink-0">
           <Swords size={11} className="text-accent-blue" />
@@ -111,24 +111,24 @@ export default function Matches() {
         <span className="font-semibold">{v?.name || '—'}</span>
       </div>
     )},
-    { key: 'teamB',   label: 'Equipa B', render: v => <span>{v?.name || '—'}</span> },
-    { key: 'date',    label: 'Data',     render: v => v || '—' },
-    { key: 'teamAScore', label: 'Score', render: (v, r) =>
+    { key: 'teamB',   label: 'Team B',     render: v => <span>{v?.name || '—'}</span> },
+    { key: 'date',    label: 'Date',        render: v => v || '—' },
+    { key: 'teamAScore', label: 'Score',   render: (v, r) =>
       r.resultRecorded
         ? <span className="font-display text-sm text-text-primary">{r.teamAScore} <span className="text-text-dim">:</span> {r.teamBScore}</span>
         : <span className="text-text-dim">—</span>
     },
-    { key: 'resultRecorded', label: 'Resultado', render: (v, r) => {
-      if (!v) return <Badge variant="gray">Pendente</Badge>
+    { key: 'resultRecorded', label: 'Result', render: (v, r) => {
+      if (!v) return <Badge variant="gray">Pending</Badge>
       const w = getWinner(r)
-      return <Badge variant={w === 'Empate' ? 'cyan' : 'green'}>{w === 'Empate' ? 'Empate' : `${w} venceu`}</Badge>
+      return <Badge variant={w === 'Draw' ? 'cyan' : 'green'}>{w === 'Draw' ? 'Draw' : `${w} won`}</Badge>
     }},
-    { key: 'tournament', label: 'Torneio', render: v => v?.name || <span className="text-text-dim">—</span> },
+    { key: 'tournament', label: 'Tournament', render: v => v?.name || <span className="text-text-dim">—</span> },
     { key: '_actions', label: '', render: (_, r) => (
       <div className="flex items-center gap-1">
         {!r.resultRecorded && (
           <button onClick={() => openResult(r)}
-            title="Registar resultado"
+            title="Record result"
             className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-accent-green hover:bg-accent-green/10 transition-all duration-150 cursor-pointer">
             <CheckCircle size={13} />
           </button>
@@ -144,53 +144,53 @@ export default function Matches() {
     <div className="animate-fade-in">
       <PageHeader
         title="Matches"
-        subtitle={`${matches.length} partidas registadas`}
+        subtitle={`${matches.length} registered matches`}
         action={
           <button onClick={openCreate} className="btn-primary">
-            <Plus size={15} /> Agendar Partida
+            <Plus size={15} /> Schedule Match
           </button>
         }
       />
 
-      <DataTable columns={columns} data={matches} loading={loading} emptyMessage="Nenhuma partida encontrada." />
+      <DataTable columns={columns} data={matches} loading={loading} emptyMessage="No matches found." />
 
-      {/* Modal Agendar */}
-      <Modal open={modal} onClose={() => setModal(false)} title="Agendar Partida" width="max-w-xl">
+      {/* Schedule modal */}
+      <Modal open={modal} onClose={() => setModal(false)} title="Schedule Match" width="max-w-xl">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Equipa A *">
+            <Field label="Team A *">
               <select className="input-field" value={form.teamAId} onChange={e => set('teamAId', e.target.value)}>
-                <option value="">Selecionar...</option>
+                <option value="">Select...</option>
                 {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </Field>
-            <Field label="Equipa B *">
+            <Field label="Team B *">
               <select className="input-field" value={form.teamBId} onChange={e => set('teamBId', e.target.value)}>
-                <option value="">Selecionar...</option>
+                <option value="">Select...</option>
                 {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </Field>
-            <Field label="Data *">
+            <Field label="Date *">
               <input type="date" className="input-field" value={form.date} onChange={e => set('date', e.target.value)} />
             </Field>
-            <Field label="Torneio *">
+            <Field label="Tournament *">
               <select className="input-field" value={form.tournamentId} onChange={e => set('tournamentId', e.target.value)}>
-                <option value="">Selecionar...</option>
+                <option value="">Select...</option>
                 {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </Field>
           </div>
           <div className="flex gap-3 justify-end pt-2">
-            <button onClick={() => setModal(false)} className="btn-ghost">Cancelar</button>
+            <button onClick={() => setModal(false)} className="btn-ghost">Cancel</button>
             <button onClick={handleSchedule} disabled={saving} className="btn-primary">
-              {saving ? 'A guardar...' : 'Agendar'}
+              {saving ? 'Saving...' : 'Schedule'}
             </button>
           </div>
         </div>
       </Modal>
 
-      {/* Modal Resultado */}
-      <Modal open={resultModal} onClose={() => setResultModal(false)} title="Registar Resultado" width="max-w-sm">
+      {/* Record result modal */}
+      <Modal open={resultModal} onClose={() => setResultModal(false)} title="Record Result" width="max-w-sm">
         <div className="space-y-4">
           <div className="text-center py-2">
             <p className="font-body text-sm text-text-muted mb-1">
@@ -198,19 +198,19 @@ export default function Matches() {
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Field label={selectedMatch?.teamA?.name || 'Equipa A'}>
+            <Field label={selectedMatch?.teamA?.name || 'Team A'}>
               <input type="number" className="input-field text-center text-lg font-display" min="0"
                 value={result.scoreA} onChange={e => setResult(r => ({ ...r, scoreA: e.target.value }))} />
             </Field>
-            <Field label={selectedMatch?.teamB?.name || 'Equipa B'}>
+            <Field label={selectedMatch?.teamB?.name || 'Team B'}>
               <input type="number" className="input-field text-center text-lg font-display" min="0"
                 value={result.scoreB} onChange={e => setResult(r => ({ ...r, scoreB: e.target.value }))} />
             </Field>
           </div>
           <div className="flex gap-3 justify-end pt-2">
-            <button onClick={() => setResultModal(false)} className="btn-ghost">Cancelar</button>
+            <button onClick={() => setResultModal(false)} className="btn-ghost">Cancel</button>
             <button onClick={handleResult} disabled={saving} className="btn-primary">
-              {saving ? 'A guardar...' : 'Confirmar'}
+              {saving ? 'Saving...' : 'Confirm'}
             </button>
           </div>
         </div>

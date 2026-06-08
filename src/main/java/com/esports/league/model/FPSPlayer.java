@@ -9,15 +9,19 @@ public class FPSPlayer extends Player {
 
     private double accuracy;
     private int headshots;
+    private Double kast;
+    private Double adr;
 
     public FPSPlayer() {}
 
     public FPSPlayer(String fullName, String nickname, String password,
                      int matchesPlayed, int wins, int losses,
-                     double accuracy, int headshots) {
+                     double accuracy, int headshots, double kast, double adr) {
         super(fullName, nickname, password, matchesPlayed, wins, losses);
         this.accuracy = accuracy;
         this.headshots = headshots;
+        this.kast = kast;
+        this.adr = adr;
     }
 
     public double getAccuracy() { return accuracy; }
@@ -25,6 +29,12 @@ public class FPSPlayer extends Player {
 
     public int getHeadshots() { return headshots; }
     public void setHeadshots(int headshots) { this.headshots = headshots; }
+
+    public Double getKast() { return kast; }
+    public void setKast(Double kast) { this.kast = kast; }
+
+    public Double getAdr() { return adr; }
+    public void setAdr(Double adr) { this.adr = adr; }
 
     @Override
     public String getPlayerType() { return "FPS"; }

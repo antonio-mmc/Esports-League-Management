@@ -4,6 +4,8 @@ const variants = {
   blue:   'bg-accent-blue/10 text-accent-blue border border-accent-blue/20',
   purple: 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20',
   gray:   'bg-bg-border/40 text-text-muted border border-bg-border',
+  orange: 'bg-orange-500/10 text-orange-400 border border-orange-500/20',
+  red:    'bg-red-500/10 text-red-400 border border-red-500/20',
 }
 
 export default function Badge({ children, variant = 'gray' }) {

@@ -2,6 +2,7 @@ package com.esports.league.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,6 +21,8 @@ public class Tournament {
     private String game;
 
     private String status = "ACTIVE";
+
+    private LocalDate startDate;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
@@ -53,6 +56,9 @@ public class Tournament {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public LocalDate getStartDate() { return startDate; }
+    public void setStartDate(LocalDate startDate) { this.startDate = startDate; }
 
     public List<Team> getParticipatingTeams() { return participatingTeams; }
     public void setParticipatingTeams(List<Team> participatingTeams) { this.participatingTeams = participatingTeams; }

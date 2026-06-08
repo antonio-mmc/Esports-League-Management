@@ -2,15 +2,15 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft, Shield, UserCheck, Users, Trophy,
-  Crosshair, Sword, Footprints, Swords, Star
+  Crosshair, Sword, Footprints, Swords, Star, Car, Skull
 } from 'lucide-react'
 import Badge from '../components/Badge'
 import { teamApi } from '../services/api'
 
-const TYPE_COLOR  = { FPS: '#06B6D4', MOBA: '#8B5CF6', EFOOTBALL: '#22C55E', GENERIC: '#94A3B8' }
-const TYPE_BADGE  = { FPS: 'cyan',    MOBA: 'purple',  EFOOTBALL: 'green',   GENERIC: 'gray'   }
-const TYPE_LABEL  = { FPS: 'FPS',     MOBA: 'MOBA',    EFOOTBALL: 'eFootball', GENERIC: 'Generic' }
-const TYPE_ICON   = { FPS: Crosshair, MOBA: Sword,     EFOOTBALL: Footprints  }
+const TYPE_COLOR  = { FPS: '#06B6D4', MOBA: '#8B5CF6', EFOOTBALL: '#22C55E', RACING: '#F59E0B', BATTLE_ROYALE: '#EF4444', GENERIC: '#94A3B8' }
+const TYPE_BADGE  = { FPS: 'cyan',    MOBA: 'purple',  EFOOTBALL: 'green',   RACING: 'orange', BATTLE_ROYALE: 'red', GENERIC: 'gray' }
+const TYPE_LABEL  = { FPS: 'FPS',     MOBA: 'MOBA',    EFOOTBALL: 'eFootball', RACING: 'Racing', BATTLE_ROYALE: 'Battle Royale', GENERIC: 'Generic' }
+const TYPE_ICON   = { FPS: Crosshair, MOBA: Sword,     EFOOTBALL: Footprints, RACING: Car, BATTLE_ROYALE: Skull }
 
 function StatPill({ label, value, accent }) {
   return (
@@ -25,20 +25,20 @@ function PlayerSpecific({ player }) {
   const type = player.playerType
   if (type === 'FPS') return (
     <div className="flex gap-3 mt-1">
-      <span className="font-body text-xs text-text-dim">Precisão: <span className="text-text-muted">{player.accuracy?.toFixed(1)}%</span></span>
+      <span className="font-body text-xs text-text-dim">Accuracy: <span className="text-text-muted">{player.accuracy?.toFixed(1)}%</span></span>
       <span className="font-body text-xs text-text-dim">Headshots: <span className="text-text-muted">{player.headshots}</span></span>
     </div>
   )
   if (type === 'MOBA') return (
     <div className="flex gap-3 mt-1">
-      <span className="font-body text-xs text-text-dim">Personagem: <span className="text-text-muted">{player.mainCharacter}</span></span>
+      <span className="font-body text-xs text-text-dim">Character: <span className="text-text-muted">{player.mainCharacter}</span></span>
       <span className="font-body text-xs text-text-dim">KDA: <span className="text-text-muted">{player.kills}/{player.deaths}/{player.mobaAssists}</span></span>
     </div>
   )
   if (type === 'EFOOTBALL') return (
     <div className="flex gap-3 mt-1">
-      <span className="font-body text-xs text-text-dim">Posição: <span className="text-text-muted">{player.mainPosition}</span></span>
-      <span className="font-body text-xs text-text-dim">Golos: <span className="text-text-muted">{player.goalsScored}</span></span>
+      <span className="font-body text-xs text-text-dim">Position: <span className="text-text-muted">{player.mainPosition}</span></span>
+      <span className="font-body text-xs text-text-dim">Goals: <span className="text-text-muted">{player.goalsScored}</span></span>
       <span className="font-body text-xs text-text-dim">Assists: <span className="text-text-muted">{player.efbAssists}</span></span>
     </div>
   )
@@ -47,8 +47,8 @@ function PlayerSpecific({ player }) {
 
 export default function TeamDetail() {
   const { id } = useParams()
-  const [team, setTeam]     = useState(null)
-  const [loading, setLoad]  = useState(true)
+  const [team, setTeam]    = useState(null)
+  const [loading, setLoad] = useState(true)
 
   useEffect(() => {
     teamApi.getById(id)
@@ -68,17 +68,17 @@ export default function TeamDetail() {
   if (!team) {
     return (
       <div className="text-center py-32">
-        <p className="font-body text-text-muted">Equipa não encontrada.</p>
-        <Link to="/teams" className="btn-ghost mt-4 inline-flex">Voltar</Link>
+        <p className="font-body text-text-muted">Team not found.</p>
+        <Link to="/teams" className="btn-ghost mt-4 inline-flex">Back</Link>
       </div>
     )
   }
 
-  const players    = team.players || []
-  const coach      = team.coach
+  const players     = team.players || []
+  const coach       = team.coach
   const tournaments = team.tournaments || []
-  const total      = team.wins + team.draws + team.losses
-  const winRate    = total > 0 ? Math.round((team.wins / total) * 100) : 0
+  const total       = team.wins + team.draws + team.losses
+  const winRate     = total > 0 ? Math.round((team.wins / total) * 100) : 0
 
   const byType = players.reduce((acc, p) => {
     const t = p.playerType || 'GENERIC'
@@ -96,7 +96,7 @@ export default function TeamDetail() {
       {/* Back */}
       <Link to="/teams" className="inline-flex items-center gap-2 text-text-muted hover:text-text-primary font-body text-sm mb-6 transition-colors cursor-pointer group">
         <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
-        Voltar às Equipas
+        Back to Teams
       </Link>
 
       {/* Hero */}
@@ -110,15 +110,15 @@ export default function TeamDetail() {
             <div>
               <h1 className="font-display text-2xl text-text-primary tracking-wide">{team.name}</h1>
               <p className="font-body text-sm text-text-muted mt-0.5">
-                {players.length} jogadores · {Object.keys(byType).map(t => TYPE_LABEL[t] || t).join(', ')}
+                {players.length} players · {Object.keys(byType).map(t => TYPE_LABEL[t] || t).join(', ')}
               </p>
             </div>
           </div>
           <div className="flex gap-3 flex-wrap">
-            <StatPill label="Vitórias" value={team.wins}   accent="#22C55E" />
-            <StatPill label="Empates"  value={team.draws}  accent="#06B6D4" />
-            <StatPill label="Derrotas" value={team.losses} accent="#F87171" />
-            <StatPill label="Pontos"   value={team.points} accent="#8B5CF6" />
+            <StatPill label="Wins"    value={team.wins}   accent="#22C55E" />
+            <StatPill label="Draws"   value={team.draws}  accent="#06B6D4" />
+            <StatPill label="Losses"  value={team.losses} accent="#F87171" />
+            <StatPill label="Points"  value={team.points} accent="#8B5CF6" />
             <StatPill label="Win Rate" value={`${winRate}%`} accent="#22C55E" />
           </div>
         </div>
@@ -129,20 +129,20 @@ export default function TeamDetail() {
         <div className="lg:col-span-2 glass-card p-5">
           <div className="flex items-center gap-2 mb-5">
             <Users size={15} className="text-accent-green" />
-            <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Jogadores</h2>
+            <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Players</h2>
             <span className="font-body text-xs text-text-dim ml-1">({players.length})</span>
           </div>
 
           {players.length === 0 ? (
-            <p className="text-sm text-text-dim font-body text-center py-10">Sem jogadores nesta equipa.</p>
+            <p className="text-sm text-text-dim font-body text-center py-10">No players in this team.</p>
           ) : (
             <div className="space-y-2">
               {players.map((p) => {
-                const Icon = TYPE_ICON[p.playerType] || Users
+                const Icon  = TYPE_ICON[p.playerType] || Users
                 const color = TYPE_COLOR[p.playerType] || '#94A3B8'
                 const pTotal = p.wins + p.losses
-                const pWr = pTotal > 0 ? Math.round((p.wins / pTotal) * 100) : 0
-                const isMVP = topPlayer?.id === p.id
+                const pWr    = pTotal > 0 ? Math.round((p.wins / pTotal) * 100) : 0
+                const isMVP  = topPlayer?.id === p.id
 
                 return (
                   <div key={p.id}
@@ -167,8 +167,8 @@ export default function TeamDetail() {
                     </div>
                     <div className="flex-shrink-0 text-right">
                       <div className="font-body text-xs text-text-dim">
-                        <span className="text-accent-green font-semibold">{p.wins}V</span>
-                        {' '}<span className="text-red-400">{p.losses}D</span>
+                        <span className="text-accent-green font-semibold">{p.wins}W</span>
+                        {' '}<span className="text-red-400">{p.losses}L</span>
                       </div>
                       <div className="font-body text-xs text-text-muted mt-0.5">{pWr}% WR</div>
                     </div>
@@ -199,7 +199,7 @@ export default function TeamDetail() {
                 </div>
               </div>
             ) : (
-              <p className="font-body text-sm text-text-dim text-center py-4">Sem coach atribuído.</p>
+              <p className="font-body text-sm text-text-dim text-center py-4">No coach assigned.</p>
             )}
           </div>
 
@@ -207,10 +207,10 @@ export default function TeamDetail() {
           <div className="glass-card p-5">
             <div className="flex items-center gap-2 mb-4">
               <Trophy size={15} className="text-accent-purple" />
-              <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Torneios</h2>
+              <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Tournaments</h2>
             </div>
             {tournaments.length === 0 ? (
-              <p className="font-body text-sm text-text-dim text-center py-4">Sem torneios.</p>
+              <p className="font-body text-sm text-text-dim text-center py-4">No tournaments.</p>
             ) : (
               <div className="space-y-2">
                 {tournaments.map(t => (
@@ -233,11 +233,11 @@ export default function TeamDetail() {
             <div className="glass-card p-5">
               <div className="flex items-center gap-2 mb-4">
                 <Swords size={15} className="text-accent-blue" />
-                <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Composição</h2>
+                <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Composition</h2>
               </div>
               <div className="space-y-3">
                 {Object.entries(byType).map(([type, count]) => {
-                  const pct = Math.round((count / players.length) * 100)
+                  const pct   = Math.round((count / players.length) * 100)
                   const color = TYPE_COLOR[type] || '#94A3B8'
                   return (
                     <div key={type}>
