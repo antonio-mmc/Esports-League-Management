@@ -1,0 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&family=Russo+One&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { color-scheme: dark; }
+
+  body {
+    background-color: #020617;
+    color: #F8FAFC;
+    font-family: 'Chakra Petch', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #0F172A; }
+  ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: #22C55E; }
+
+  ::selection { background: rgba(34,197,94,0.25); color: #F8FAFC; }
+}
+
+@layer components {
+  .glass-card {
+    background: rgba(13, 24, 41, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(30, 41, 59, 0.8);
+    border-radius: 12px;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-200 cursor-pointer;
+  }
+  .glass-card-hover:hover {
+    border-color: rgba(34, 197, 94, 0.3);
+    box-shadow: 0 0 24px rgba(34, 197, 94, 0.08), 0 4px 32px rgba(0,0,0,0.4);
+    transform: translateY(-1px);
+  }
+
+  .neon-text {
+    text-shadow: 0 0 20px rgba(34,197,94,0.6);
+  }
+
+  .neon-border {
+    border-color: rgba(34,197,94,0.5);
+    box-shadow: 0 0 12px rgba(34,197,94,0.15), inset 0 0 12px rgba(34,197,94,0.05);
+  }
+
+  .btn-primary {
+    @apply bg-accent-green text-bg-base font-body font-semibold px-4 py-2 rounded-lg
+           transition-all duration-200 cursor-pointer inline-flex items-center gap-2;
+  }
+  .btn-primary:hover {
+    box-shadow: 0 0 20px rgba(34,197,94,0.4);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-ghost {
+    @apply text-text-muted font-body font-medium px-4 py-2 rounded-lg
+           border border-bg-border transition-all duration-200 cursor-pointer inline-flex items-center gap-2;
+  }
+  .btn-ghost:hover { @apply border-text-muted text-text-primary; }
+
+  .badge {
+    @apply text-xs font-semibold px-2 py-0.5 rounded-full font-body;
+  }
+
+  .input-field {
+    @apply w-full bg-bg-primary border border-bg-border rounded-lg px-3 py-2
+           text-text-primary font-body text-sm placeholder-text-dim
+           focus:outline-none focus:border-accent-green transition-colors duration-200;
+  }
+
+  .section-title {
+    @apply font-display text-text-primary tracking-wide;
+  }
+
+  .divider {
+    @apply border-t border-bg-border;
+  }
+}
+
+@layer utilities {
+  .text-gradient-green {
+    background: linear-gradient(135deg, #22C55E, #06B6D4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(rgba(30,41,59,0.3) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(30,41,59,0.3) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .glow-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #22C55E;
+    box-shadow: 0 0 8px #22C55E, 0 0 16px rgba(34,197,94,0.5);
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+}

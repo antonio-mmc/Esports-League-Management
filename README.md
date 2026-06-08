@@ -1,76 +1,88 @@
-# 🏆 eSports League Management System
+# ESports League Management System
 
-A professional Java-based management system for eSports leagues, featuring role-based access control for **Administrators**, **Coaches**, and **Players**. This project demonstrates Object-Oriented Programming (OOP) principles, data persistence using CSV, and a clean command-line interface.
-
----
-
-## 🚀 Features
-
-- **Multi-Role System**:
-  - **🛡️ Administrators**: Create and manage tournaments, schedule matches, and manage user accounts (Players/Coaches).
-  - **🧠 Coaches**: Create teams, recruit players, and register teams for upcoming tournaments.
-  - **🎮 Players**: Manage personal profiles, view tournament participation, and track performance statistics.
-- **Dynamic Tournament Logic**: Supports multiple tournament types (e.g., FIFA/eFootball, FPS, MOBA) with specialized player statistics.
-- **Persistence Layer**: Data is automatically saved and loaded from standard CSV files, ensuring session-to-session continuity.
-- **Clean Architecture**: Organized into `model`, `repository`, and `app` layers for high maintainability.
+A full-stack eSports league management platform built with Spring Boot and React. Manages players, coaches, teams, tournaments and matches across multiple game types (FPS, MOBA, eFootball).
 
 ---
 
-## 🛠️ Technologies Used
+## Tech Stack
 
-- **Language**: Java 17+
-- **Persistence**: File-based CSV (Custom Repository Pattern)
-- **Build Tool**: Maven (for dependency management and packaging)
-- **Concepts**: Inheritance, Polymorphism, Encapsulation, Exception Handling.
+**Backend**
+- Java 21 + Spring Boot 3.3
+- Spring Data JPA + H2 (file-based, persistent)
+- RESTful API on `localhost:8080`
+
+**Frontend**
+- React 18 + Vite
+- Tailwind CSS
+- React Router + Axios
+- Runs on `localhost:5173`
 
 ---
 
-## 📥 Getting Started
+## Getting Started
 
 ### Prerequisites
-- [Java JDK 17+](https://www.oracle.com/java/technologies/downloads/)
-- [Maven](https://maven.apache.org/download.cgi) (optional, if you want to use the build script)
+- Java 21+
+- Maven
+- Node.js 18+
 
-### Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-username/esports-league-management.git
-   ```
-2. Navigate to the project directory:
-   ```bash
-   cd esports-league-management
-   ```
+### 1. Start the Backend
 
-### Running the App
-You can run the application directly using Maven:
 ```bash
-mvn compile exec:java -Dexec.mainClass="com.esports.league.app.ESportsLeagueApp"
+mvn spring-boot:run
 ```
-Or simply run the `ESportsLeagueApp.java` main class in your favorite IDE.
+
+On first run, the database is automatically seeded with:
+- 6 teams (FPS, MOBA, eFootball)
+- 30 players across all game types
+- 6 coaches
+- 3 tournaments
+- 11 matches (6 completed, 5 upcoming)
+
+### 2. Start the Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`
 
 ---
 
-## 📈 Learning Outcomes
+## Features
 
-During the development of this project, I strengthened my understanding of:
-- **Object-Oriented Design**: Implementing complex class hierarchies with inheritance (e.g., specialised Players for different game types).
-- **Data Persistence**: Architecting a CSV-based storage solution from scratch without external databases.
-- **Logic & Validation**: Implementing robust input validation and rule-based systems for tournament standings.
-- **Code Organization**: Transitioning from a flat project structure to a professional, package-based Java architecture.
-
----
-
-## 🛠️ Future Improvements
-
-- [ ] **GUI Implementation**: Transition from a CLI to a modern JavaFX or Swing interface.
-- [ ] **Database Integration**: Replace CSV storage with a relational database (SQLite/MySQL) using JDBC.
-- [ ] **REST API**: Expose the league logic via a Spring Boot backend.
-- [ ] **Unit Testing**: Implement JUnit tests for core business logic.
+- **Dashboard** — live stats, team leaderboard, top players by win rate, game type breakdown
+- **Players** — full CRUD with type-specific stats (accuracy/headshots for FPS, KDA for MOBA, goals for eFootball)
+- **Coaches** — manage coaches and team assignments
+- **Teams** — standings table with W/D/L/points, detail page with roster and coach
+- **Tournaments** — manage tournaments with participating teams
+- **Matches** — schedule matches, record results, automatic win/loss tracking
 
 ---
 
-## 📄 License
-This project was developed for academic purposes as part of the **Object-Oriented Programming (POO)** course.
+## Project Structure
+
+```
+├── src/                    # Spring Boot backend
+│   └── main/java/com/esports/league/
+│       ├── model/          # Entities (Player, Team, Coach, Tournament, Match)
+│       ├── repository/     # Spring Data JPA repositories
+│       ├── service/        # Business logic
+│       ├── controller/     # REST controllers
+│       └── config/         # CORS, exception handler, data initializer
+├── frontend/               # React frontend
+│   └── src/
+│       ├── components/     # Layout, Sidebar, Table, Modal, Toast, etc.
+│       ├── pages/          # Dashboard, Players, Coaches, Teams, Tournaments, Matches
+│       └── services/       # Axios API client
+├── data/                   # H2 database files (auto-generated, not committed)
+└── pom.xml
+```
 
 ---
-*Developed by [Your Name] - Ready for professional challenges!*
+
+## Data Persistence
+
+Data is stored in a local H2 file database (`data/esportsdb`). It persists between restarts. To reset to the initial seed data, delete the `data/` folder and restart the backend.

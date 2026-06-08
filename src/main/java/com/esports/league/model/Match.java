@@ -1,134 +1,86 @@
 package com.esports.league.model;
 
-import java.io.Serializable;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.persistence.*;
 import java.time.LocalDate;
 
-/**
- * Represents a Match between two teams.
- */
-public class Match implements Serializable {
-    private static final long serialVersionUID = 1L;
+@Entity
+@Table(name = "matches")
+public class Match {
 
-    private final int id;
-    private static int idCounter = 1;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_a_id", nullable = false)
+    @JsonIgnoreProperties({"players", "coach", "tournaments", "hibernateLazyInitializer"})
     private Team teamA;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_b_id", nullable = false)
+    @JsonIgnoreProperties({"players", "coach", "tournaments", "hibernateLazyInitializer"})
     private Team teamB;
+
     private int teamAScore;
     private int teamBScore;
     private LocalDate date;
-    private boolean isResultRecorded;
+    private boolean resultRecorded;
 
-    public Match(Team teamA, Team teamB, String date) {
-        if (teamA == null || teamB == null) {
-            throw new IllegalArgumentException("Teams cannot be null.");
-        }
-        if (date == null || date.strip().isEmpty()) {
-            throw new IllegalArgumentException("Match date cannot be empty.");
-        }
-        this.id = idCounter++;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tournament_id")
+    @JsonIgnoreProperties({"matches", "participatingTeams", "hibernateLazyInitializer"})
+    private Tournament tournament;
+
+    public Match() {}
+
+    public Match(Team teamA, Team teamB, LocalDate date, Tournament tournament) {
         this.teamA = teamA;
         this.teamB = teamB;
-        this.date = LocalDate.parse(date);
-        this.teamAScore = 0;
-        this.teamBScore = 0;
-        this.isResultRecorded = false;
+        this.date = date;
+        this.tournament = tournament;
     }
 
     // Getters and Setters
-    public int getId() {
-        return id;
-    }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-    public Team getTeamA() {
-        return teamA;
-    }
+    public Team getTeamA() { return teamA; }
+    public void setTeamA(Team teamA) { this.teamA = teamA; }
 
-    public void setTeamA(Team teamA) {
-        if (teamA == null) throw new IllegalArgumentException("Team A cannot be null.");
-        this.teamA = teamA;
-    }
+    public Team getTeamB() { return teamB; }
+    public void setTeamB(Team teamB) { this.teamB = teamB; }
 
-    public Team getTeamB() {
-        return teamB;
-    }
+    public int getTeamAScore() { return teamAScore; }
+    public void setTeamAScore(int teamAScore) { this.teamAScore = teamAScore; }
 
-    public void setTeamB(Team teamB) {
-        if (teamB == null) throw new IllegalArgumentException("Team B cannot be null.");
-        this.teamB = teamB;
-    }
+    public int getTeamBScore() { return teamBScore; }
+    public void setTeamBScore(int teamBScore) { this.teamBScore = teamBScore; }
 
-    public int getTeamAScore() {
-        return teamAScore;
-    }
+    public LocalDate getDate() { return date; }
+    public void setDate(LocalDate date) { this.date = date; }
 
-    public void setTeamAScore(int score) {
-        if (score < 0) throw new IllegalArgumentException("Score cannot be negative.");
-        this.teamAScore = score;
-    }
+    public boolean isResultRecorded() { return resultRecorded; }
+    public void setResultRecorded(boolean resultRecorded) { this.resultRecorded = resultRecorded; }
 
-    public int getTeamBScore() {
-        return teamBScore;
-    }
+    public Tournament getTournament() { return tournament; }
+    public void setTournament(Tournament tournament) { this.tournament = tournament; }
 
-    public void setTeamBScore(int score) {
-        if (score < 0) throw new IllegalArgumentException("Score cannot be negative.");
-        this.teamBScore = score;
-    }
-
-    public LocalDate getDate() {
-        return date;
-    }
-
-    public void setDate(LocalDate date) {
-        if (date == null) throw new IllegalArgumentException("Date cannot be null.");
-        this.date = date;
-    }
-
-    public boolean isResultRecorded() {
-        return isResultRecorded;
-    }
-
-    public static void setIdCounter(int counter) {
-        if (counter < 0) {
-            throw new IllegalArgumentException("ID counter cannot be negative.");
-        }
-        Match.idCounter = counter;
-    }
-
-    // Business Logic Methods
     public void recordResult(int scoreA, int scoreB) {
-        if (isResultRecorded) {
-            throw new IllegalStateException("Result has already been recorded for this match.");
-        }
-        if (scoreA < 0 || scoreB < 0) {
-            throw new IllegalArgumentException("Scores cannot be negative.");
-        }
+        if (resultRecorded) throw new IllegalStateException("Result already recorded.");
         this.teamAScore = scoreA;
         this.teamBScore = scoreB;
+        this.resultRecorded = true;
 
         if (scoreA > scoreB) {
             teamA.registerWin();
             teamB.registerLoss();
-            System.out.println("Win recorded for " + teamA.getName() + ".");
-        } else if (scoreA < scoreB) {
+        } else if (scoreB > scoreA) {
             teamB.registerWin();
             teamA.registerLoss();
-            System.out.println("Win recorded for " + teamB.getName() + ".");
         } else {
             teamA.registerDraw();
             teamB.registerDraw();
-            System.out.println("Draw recorded.");
         }
-        this.isResultRecorded = true;
-    }
-
-    public void displayDetails() {
-        System.out.println("Match #" + id + " [" + date + "]");
-        System.out.println(teamA.getName() + " " + teamAScore + " - " + teamBScore + " " + teamB.getName());
-    }
-
-    @Override
-    public String toString() {
-        return "Match #" + id + ": " + teamA.getName() + " " + teamAScore + " - " + teamBScore + " " + teamB.getName() + " (" + date + ")";
     }
 }

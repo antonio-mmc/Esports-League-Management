@@ -45,13 +45,12 @@ buildNumber.properties
 .vscode/
 .DS_Store
 
-# Persistence (Optional: if you want users to start with a fresh state)
-# administrators.csv
-# players.csv
-# matches.csv
-# tournaments.csv
-# coaches.csv
-# teams.csv
+# H2 file-based database
+data/
 
 # Bin directory (compiled classes)
 bin/
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/

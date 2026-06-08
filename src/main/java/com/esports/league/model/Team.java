@@ -1,171 +1,87 @@
 package com.esports.league.model;
 
-import java.io.Serializable;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Represents a Team in the eSports League.
- * A team consists of a name, several players, and a coach.
- */
-public class Team implements Serializable {
-    private static final long serialVersionUID = 1L;
+@Entity
+@Table(name = "teams")
+public class Team {
 
-    private final int id;
-    private static int idCounter = 1;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
     private String name;
+
     private int wins;
     private int draws;
     private int losses;
     private int points;
-    private final List<Player> players;
+
+    @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnoreProperties("team")
+    private List<Player> players = new ArrayList<>();
+
+    @OneToOne(mappedBy = "team", fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"team", "hibernateLazyInitializer"})
     private Coach coach;
 
-    public Team(String name, int points) {
-        this.id = idCounter++;
+    @ManyToMany(mappedBy = "participatingTeams", fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"participatingTeams", "matches", "hibernateLazyInitializer"})
+    private List<Tournament> tournaments = new ArrayList<>();
+
+    public Team() {}
+
+    public Team(String name) {
         this.name = name;
-        this.points = points;
-        this.wins = 0;
-        this.draws = 0;
-        this.losses = 0;
-        this.players = new ArrayList<>();
-        this.coach = null;
     }
 
     // Getters and Setters
-    public int getId() {
-        return id;
-    }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-    public String getName() {
-        return name;
-    }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
 
-    public void setName(String name) {
-        if (name == null || name.strip().isEmpty()) {
-            throw new IllegalArgumentException("Team name cannot be empty.");
-        }
-        this.name = name;
-    }
+    public int getWins() { return wins; }
+    public void setWins(int wins) { this.wins = wins; }
 
-    public int getPoints() {
-        return points;
-    }
+    public int getDraws() { return draws; }
+    public void setDraws(int draws) { this.draws = draws; }
 
-    public void setPoints(int points) {
-        if (points < 0) {
-            throw new IllegalArgumentException("Points cannot be negative.");
-        }
-        this.points = points;
-    }
+    public int getLosses() { return losses; }
+    public void setLosses(int losses) { this.losses = losses; }
 
-    public int getWins() {
-        return wins;
-    }
+    public int getPoints() { return points; }
+    public void setPoints(int points) { this.points = points; }
 
-    public void setWins(int wins) {
-        if (wins < 0) {
-            throw new IllegalArgumentException("Wins cannot be negative.");
-        }
-        this.wins = wins;
-    }
+    public List<Player> getPlayers() { return players; }
+    public void setPlayers(List<Player> players) { this.players = players; }
 
-    public int getDraws() {
-        return draws;
-    }
+    public Coach getCoach() { return coach; }
+    public void setCoach(Coach coach) { this.coach = coach; }
 
-    public void setDraws(int draws) {
-        if (draws < 0) {
-            throw new IllegalArgumentException("Draws cannot be negative.");
-        }
-        this.draws = draws;
-    }
-
-    public int getLosses() {
-        return losses;
-    }
-
-    public void setLosses(int losses) {
-        if (losses < 0) {
-            throw new IllegalArgumentException("Losses cannot be negative.");
-        }
-        this.losses = losses;
-    }
-
-    public List<Player> getPlayers() {
-        return new ArrayList<>(players);
-    }
-
-    public Coach getCoach() {
-        return coach;
-    }
-
-    public void setCoach(Coach coach) {
-        if (this.coach != null) {
-            throw new IllegalStateException("Team already has a coach.");
-        }
-        this.coach = coach;
-    }
-
-    public static void setIdCounter(int counter) {
-        if (counter < 0) {
-            throw new IllegalArgumentException("ID counter cannot be negative.");
-        }
-        Team.idCounter = counter;
-    }
-
-    // Business Logic Methods
-    public boolean addPlayer(Player player) {
-        if (player == null) {
-            throw new IllegalArgumentException("Player cannot be null.");
-        }
-        if (!players.contains(player)) {
-            players.add(player);
-            return true;
-        }
-        return false;
-    }
-
-    public boolean removePlayer(Player player) {
-        if (player == null) {
-            throw new IllegalArgumentException("Player cannot be null.");
-        }
-        return players.remove(player);
-    }
-
-    public void listPlayers() {
-        if (players.isEmpty()) {
-            System.out.println("No players associated with team: " + name);
-        } else {
-            System.out.println("--- Players of " + name + " ---");
-            players.forEach(p -> System.out.println("- ID: " + p.getId() + ", Name: " + p.getFullName() + ", Nickname: " + p.getNickname()));
-        }
-    }
+    public List<Tournament> getTournaments() { return tournaments; }
+    public void setTournaments(List<Tournament> tournaments) { this.tournaments = tournaments; }
 
     public void registerWin() {
         wins++;
-        updatePoints();
+        recalcPoints();
     }
 
     public void registerDraw() {
         draws++;
-        updatePoints();
+        recalcPoints();
     }
 
     public void registerLoss() {
         losses++;
     }
 
-    private void updatePoints() {
-        this.points = (wins * 3) + (draws * 1);
-    }
-
-    public void consultStatistics() {
-        System.out.println("--- Statistics for Team: " + name + " ---");
-        System.out.println("Wins: " + wins);
-        System.out.println("Draws: " + draws);
-        System.out.println("Losses: " + losses);
-        System.out.println("Total Points: " + points);
-        System.out.println("Number of Players: " + players.size());
+    private void recalcPoints() {
+        this.points = wins * 3 + draws;
     }
 }
