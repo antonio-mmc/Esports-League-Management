@@ -22,6 +22,10 @@ public class Tournament {
 
     private String status = "ACTIVE";
 
+    private String format = "LEAGUE"; // LEAGUE, SINGLE_ELIMINATION, DOUBLE_ELIMINATION, GROUP_STAGE
+
+    private String specificGame; // e.g., Valorant, League of Legends, FIFA, iRacing, PUBG
+
     private LocalDate startDate;
 
     @ManyToMany(fetch = FetchType.LAZY)
@@ -56,6 +60,12 @@ public class Tournament {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public String getFormat() { return format; }
+    public void setFormat(String format) { this.format = format; }
+
+    public String getSpecificGame() { return specificGame; }
+    public void setSpecificGame(String specificGame) { this.specificGame = specificGame; }
 
     public LocalDate getStartDate() { return startDate; }
     public void setStartDate(LocalDate startDate) { this.startDate = startDate; }

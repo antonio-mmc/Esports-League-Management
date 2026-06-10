@@ -31,6 +31,32 @@ public class DataInitializer implements CommandLineRunner {
         this.matchRepo = matchRepo;
     }
 
+    private static final Map<String, String[]> COACH_PROFILES = Map.ofEntries(
+        Map.entry("Marcus Webb",        new String[]{"United Kingdom", "London",    "1985-03-15", "FPS"}),
+        Map.entry("Sofia Reyes",        new String[]{"Spain",          "Valencia",  "1988-07-22", "FPS"}),
+        Map.entry("Jin Park",           new String[]{"South Korea",    "Busan",     "1986-11-08", "FPS"}),
+        Map.entry("Lena Müller",        new String[]{"Germany",        "Hamburg",   "1990-04-30", "MOBA"}),
+        Map.entry("Dario Costa",        new String[]{"Italy",          "Naples",    "1987-09-12", "MOBA"}),
+        Map.entry("Priya Nair",         new String[]{"India",          "Chennai",   "1991-02-14", "EFOOTBALL"}),
+        Map.entry("Alessandro Romano",  new String[]{"Italy",          "Turin",     "1983-06-20", "RACING"}),
+        Map.entry("Hans Brauer",        new String[]{"Germany",        "Frankfurt", "1984-12-03", "RACING"}),
+        Map.entry("Rafael Souza",       new String[]{"Brazil",         "São Paulo", "1989-08-17", "BATTLE_ROYALE"}),
+        Map.entry("Ji-ho Cho",          new String[]{"South Korea",    "Incheon",   "1992-05-25", "BATTLE_ROYALE"})
+    );
+
+    private static final Map<String, List<String>> COACH_ACHIEVEMENTS = Map.ofEntries(
+        Map.entry("Marcus Webb",        List.of("FPS Coach of the Year 2025", "Led Team Nexus to 2nd place — Valorant Spring Cup 2025")),
+        Map.entry("Sofia Reyes",        List.of("Best Newcomer Coach Award 2025")),
+        Map.entry("Jin Park",           List.of("FPS Champions — Phantom Spring Invitational 2025", "Most Improved Team Award 2025")),
+        Map.entry("Lena Müller",        List.of("MOBA Regional Champion 2024")),
+        Map.entry("Dario Costa",        List.of("Echo Strike Top 4 — LoL Summer League 2025")),
+        Map.entry("Priya Nair",         List.of("eFootball League Coach Award 2025")),
+        Map.entry("Alessandro Romano",  List.of("SimRacing Coach of the Year 2024")),
+        Map.entry("Hans Brauer",        List.of("Nitro Kings Champions — SimRacing Pro League 2025", "Best Tactical Setup Award 2025")),
+        Map.entry("Rafael Souza",       List.of("Battle Royale Upset Award 2025")),
+        Map.entry("Ji-ho Cho",          List.of("Zone Control Series Champion 2024", "Tactical Excellence Award 2025"))
+    );
+
     // eFootball nickname → [shotsOnTarget, ballRecoveries]
     private static final Map<String, int[]> EFB_STATS = Map.of(
         "iBerg",   new int[]{31,  8},
@@ -104,7 +130,15 @@ public class DataInitializer implements CommandLineRunner {
             boolean racingMissing   = playerRepo.findAll().stream().noneMatch(p -> p instanceof RacingPlayer);
             boolean brMissing       = playerRepo.findAll().stream().noneMatch(p -> p instanceof BattleRoyalePlayer);
             boolean historyMissing  = tournamentRepo.findAll().stream().noneMatch(t -> "COMPLETED".equals(t.getStatus()));
-            if (!playersMissing && !tourneysMissing && !fpsMissing && !efbMissing && !racingMissing && !brMissing && !historyMissing) return;
+            boolean moreUpcoming    = matchRepo.findAll().stream().filter(m -> !m.isResultRecorded()).count() < 20;
+            boolean coachesMissing          = coachRepo.findAll().stream().anyMatch(c -> c.getNationality() == null);
+            boolean coachAchievementsMissing = coachRepo.findAll().stream().allMatch(c -> c.getAchievements().isEmpty());
+            boolean freeAgentsMissing        = coachRepo.findAll().stream().noneMatch(c -> c.getTeam() == null);
+            boolean teamDataMissing          = teamRepo.findAll().stream().anyMatch(t -> t.getGame() == null);
+            boolean teamInfoMissing          = teamRepo.findAll().stream().anyMatch(t -> t.getFoundedYear() == null);
+            boolean specificGameMissing      = tournamentRepo.findAll().stream().anyMatch(t -> t.getSpecificGame() == null);
+            boolean eliminationMissing       = tournamentRepo.findAll().stream().noneMatch(t -> t.getFormat() != null && !"LEAGUE".equals(t.getFormat()));
+            if (!playersMissing && !tourneysMissing && !fpsMissing && !efbMissing && !racingMissing && !brMissing && !historyMissing && !moreUpcoming && !coachesMissing && !coachAchievementsMissing && !freeAgentsMissing && !teamDataMissing && !teamInfoMissing && !specificGameMissing && !eliminationMissing) return;
 
             if (playersMissing) {
                 playerRepo.findAll().forEach(p -> {
@@ -144,31 +178,151 @@ public class DataInitializer implements CommandLineRunner {
                 });
             }
 
-            if (racingMissing) seedRacing();
-            if (brMissing)     seedBattleRoyale();
+            if (racingMissing)  seedRacing();
+            if (brMissing)      seedBattleRoyale();
             if (historyMissing) seedHistory();
+            if (moreUpcoming)   seedMoreUpcoming();
+
+            if (coachesMissing) {
+                coachRepo.findAll().forEach(c -> {
+                    String[] d = COACH_PROFILES.get(c.getName());
+                    if (d != null && c.getNationality() == null) {
+                        c.setNationality(d[0]);
+                        c.setCity(d[1]);
+                        c.setBirthDate(LocalDate.parse(d[2]));
+                        c.setSpecialization(d[3]);
+                        coachRepo.save(c);
+                    }
+                });
+            }
+
+            if (coachAchievementsMissing) {
+                coachRepo.findAll().forEach(c -> {
+                    if (!c.getAchievements().isEmpty()) return;
+                    List<String> ach = COACH_ACHIEVEMENTS.get(c.getName());
+                    if (ach != null) {
+                        c.setAchievements(new ArrayList<>(ach));
+                        coachRepo.save(c);
+                    }
+                });
+            }
+
+            if (freeAgentsMissing) {
+                if (coachRepo.findAll().stream().noneMatch(c -> c.getTeam() == null)) {
+                    Coach freeCoach = new Coach("Tomás Ferreira", "t.ferreira@freeagent.gg", "password");
+                    freeCoach.setNationality("Portugal");
+                    freeCoach.setCity("Porto");
+                    freeCoach.setBirthDate(LocalDate.of(1988, 9, 14));
+                    freeCoach.setSpecialization("FPS");
+                    freeCoach.setAchievements(new ArrayList<>(List.of("Head Coach — Team Nexus 2023–2024", "FPS Regional Finals 2024")));
+                    coachRepo.save(freeCoach);
+                }
+                if (playerRepo.findAll().stream().noneMatch(p -> p.getTeam() == null)) {
+                    FPSPlayer freePlayer = new FPSPlayer("Lucas Petit", "lPetit", "password", 10, 6, 4, 72.5, 187, 73.8, 149.2);
+                    freePlayer.setNationality("France");
+                    freePlayer.setCity("Lyon");
+                    freePlayer.setBirthDate(LocalDate.of(2002, 3, 18));
+                    freePlayer.setAchievements(new ArrayList<>(List.of("MVP — Solo Queue Championship 2025")));
+                    playerRepo.save(freePlayer);
+                }
+            }
+
+            if (teamDataMissing) {
+                Map<String, String[]> TEAM_META = Map.ofEntries(
+                    Map.entry("Team Nexus",    new String[]{"FPS",           "Portugal"}),
+                    Map.entry("Storm Raiders", new String[]{"FPS",           "Japan"}),
+                    Map.entry("Phantom Squad", new String[]{"FPS",           "Sweden"}),
+                    Map.entry("Iron Wolves",   new String[]{"MOBA",          "Germany"}),
+                    Map.entry("Echo Strike",   new String[]{"MOBA",          "Italy"}),
+                    Map.entry("Apex Horizon",  new String[]{"EFOOTBALL",     "Norway"}),
+                    Map.entry("Velocity Grid", new String[]{"RACING",        "Italy"}),
+                    Map.entry("Nitro Kings",   new String[]{"RACING",        "Germany"}),
+                    Map.entry("Drop Zone",     new String[]{"BATTLE_ROYALE", "Brazil"}),
+                    Map.entry("Zone Control",  new String[]{"BATTLE_ROYALE", "South Korea"})
+                );
+                Map<String, Integer> TEAM_TROPHIES = Map.of(
+                    "Team Nexus",    1, "Storm Raiders", 1, "Phantom Squad", 1,
+                    "Iron Wolves",   1, "Echo Strike",   1, "Apex Horizon",  1,
+                    "Velocity Grid", 1, "Nitro Kings",   1,
+                    "Drop Zone",     1, "Zone Control",  1
+                );
+                teamRepo.findAll().forEach(t -> {
+                    if (t.getGame() != null) return;
+                    String[] meta = TEAM_META.get(t.getName());
+                    if (meta != null) { t.setGame(meta[0]); t.setNationality(meta[1]); }
+                    Integer trophies = TEAM_TROPHIES.get(t.getName());
+                    if (trophies != null) t.setTrophies(trophies);
+                    teamRepo.save(t);
+                });
+            }
+
+            if (specificGameMissing) {
+                tournamentRepo.findAll().forEach(t -> {
+                    if (t.getSpecificGame() != null) return;
+                    t.setSpecificGame(inferSpecificGame(t.getName(), t.getGame()));
+                    if (t.getFormat() == null) t.setFormat("LEAGUE");
+                    tournamentRepo.save(t);
+                });
+            }
+
+            if (eliminationMissing) seedElimination();
+
+            if (teamInfoMissing) {
+                record TI(String city, int year, List<String> history) {}
+                Map<String, TI> TEAM_INFO = Map.ofEntries(
+                    Map.entry("Team Nexus",    new TI("Porto",       2022, List.of("David Costa (2022–2023)"))),
+                    Map.entry("Storm Raiders", new TI("Los Angeles", 2021, List.of())),
+                    Map.entry("Phantom Squad", new TI("Stockholm",   2020, List.of("Lars Eriksson (2020–2022)"))),
+                    Map.entry("Iron Wolves",   new TI("Berlin",      2021, List.of())),
+                    Map.entry("Echo Strike",   new TI("Rome",        2022, List.of())),
+                    Map.entry("Apex Horizon",  new TI("Oslo",        2023, List.of())),
+                    Map.entry("Velocity Grid", new TI("Turin",       2022, List.of("Marco Ferrari (2022–2023)"))),
+                    Map.entry("Nitro Kings",   new TI("Munich",      2021, List.of())),
+                    Map.entry("Drop Zone",     new TI("São Paulo", 2023, List.of())),
+                    Map.entry("Zone Control",  new TI("Seoul",       2022, List.of()))
+                );
+                teamRepo.findAll().forEach(t -> {
+                    if (t.getFoundedYear() != null) return;
+                    TI ti = TEAM_INFO.get(t.getName());
+                    if (ti != null) {
+                        t.setCity(ti.city());
+                        t.setFoundedYear(ti.year());
+                        if (!ti.history().isEmpty()) t.setCoachHistory(new ArrayList<>(ti.history()));
+                        teamRepo.save(t);
+                    }
+                });
+            }
 
             return;
         }
 
         // ── Teams ──────────────────────────────────────────────────────────────
-        Team nexus   = team("Team Nexus",    9,  3, 0, 1);
-        Team storm   = team("Storm Raiders", 6,  2, 0, 2);
-        Team phantom = team("Phantom Squad", 12, 4, 0, 0);
-        Team iron    = team("Iron Wolves",   3,  1, 0, 3);
-        Team echo    = team("Echo Strike",   7,  2, 1, 1);
-        Team apex    = team("Apex Horizon",  10, 3, 1, 0);
+        Team nexus   = team("Team Nexus",    9,  3, 1); nexus.setNationality("Portugal");   nexus.setGame("FPS");           nexus.setTrophies(1); nexus.setCity("Porto");        nexus.setFoundedYear(2022); nexus.setCoachHistory(new ArrayList<>(List.of("David Costa (2022–2023)")));
+        Team storm   = team("Storm Raiders", 6,  2, 2); storm.setNationality("Japan");      storm.setGame("FPS");           storm.setTrophies(1); storm.setCity("Los Angeles");   storm.setFoundedYear(2021);
+        Team phantom = team("Phantom Squad", 12, 4, 0); phantom.setNationality("Sweden");   phantom.setGame("FPS");         phantom.setTrophies(1); phantom.setCity("Stockholm"); phantom.setFoundedYear(2020); phantom.setCoachHistory(new ArrayList<>(List.of("Lars Eriksson (2020–2022)")));
+        Team iron    = team("Iron Wolves",   3,  1, 3); iron.setNationality("Germany");     iron.setGame("MOBA");           iron.setTrophies(1); iron.setCity("Berlin");          iron.setFoundedYear(2021);
+        Team echo    = team("Echo Strike",   6,  2, 1); echo.setNationality("Italy");       echo.setGame("MOBA");           echo.setTrophies(1); echo.setCity("Rome");            echo.setFoundedYear(2022);
+        Team apex    = team("Apex Horizon",  9,  3, 0); apex.setNationality("Norway");      apex.setGame("EFOOTBALL");      apex.setTrophies(1); apex.setCity("Oslo");            apex.setFoundedYear(2023);
         teamRepo.saveAll(List.of(nexus, storm, phantom, iron, echo, apex));
 
         // ── Coaches ────────────────────────────────────────────────────────────
         coachRepo.saveAll(List.of(
-            coach("Marcus Webb",  "marcus@nexus.gg",   nexus),
-            coach("Sofia Reyes",  "sofia@storm.gg",    storm),
-            coach("Jin Park",     "jin@phantom.gg",    phantom),
-            coach("Lena Müller",  "lena@iron.gg",      iron),
-            coach("Dario Costa",  "dario@echo.gg",     echo),
-            coach("Priya Nair",   "priya@apex.gg",     apex)
+            coach("Marcus Webb",  "marcus@nexus.gg",   nexus,   "United Kingdom", "London",    "1985-03-15", "FPS"),
+            coach("Sofia Reyes",  "sofia@storm.gg",    storm,   "Spain",          "Valencia",  "1988-07-22", "FPS"),
+            coach("Jin Park",     "jin@phantom.gg",    phantom, "South Korea",    "Busan",     "1986-11-08", "FPS"),
+            coach("Lena Müller",  "lena@iron.gg",      iron,    "Germany",        "Hamburg",   "1990-04-30", "MOBA"),
+            coach("Dario Costa",  "dario@echo.gg",     echo,    "Italy",          "Naples",    "1987-09-12", "MOBA"),
+            coach("Priya Nair",   "priya@apex.gg",     apex,    "India",          "Chennai",   "1991-02-14", "EFOOTBALL")
         ));
+
+        // ── Free agent coach (no team) ────────────────────────────────────────
+        Coach freeCoach = new Coach("Tomás Ferreira", "t.ferreira@freeagent.gg", "password");
+        freeCoach.setNationality("Portugal");
+        freeCoach.setCity("Porto");
+        freeCoach.setBirthDate(LocalDate.of(1988, 9, 14));
+        freeCoach.setSpecialization("FPS");
+        freeCoach.setAchievements(new ArrayList<>(List.of("Head Coach — Team Nexus 2023–2024", "FPS Regional Finals 2024")));
+        coachRepo.save(freeCoach);
 
         // ── FPS Players (Nexus + Storm + Phantom) ──────────────────────────────
         playerRepo.saveAll(List.of(
@@ -190,6 +344,14 @@ public class DataInitializer implements CommandLineRunner {
             fps("Chloe Dubois",    "cDubois",    phantom, 14, 11, 3, 78.2, 344, 80.3, 171.2, "France",   "Paris",       LocalDate.of(2002, 12,  1)),
             fps("Leo Santos",      "lSantos",    phantom, 12, 10, 2, 76.1, 310, 78.5, 165.8, "Brazil",   "São Paulo",   LocalDate.of(2001,  5, 20))
         ));
+
+        // ── Free agent player (no team) ───────────────────────────────────────
+        FPSPlayer freePlayer = new FPSPlayer("Lucas Petit", "lPetit", "password", 10, 6, 4, 72.5, 187, 73.8, 149.2);
+        freePlayer.setNationality("France");
+        freePlayer.setCity("Lyon");
+        freePlayer.setBirthDate(LocalDate.of(2002, 3, 18));
+        freePlayer.setAchievements(new ArrayList<>(List.of("MVP — Solo Queue Championship 2025")));
+        playerRepo.save(freePlayer);
 
         // ── MOBA Players (Iron + Echo) ─────────────────────────────────────────
         playerRepo.saveAll(List.of(
@@ -241,6 +403,7 @@ public class DataInitializer implements CommandLineRunner {
         seedRacing();
         seedBattleRoyale();
         seedHistory();
+        seedElimination();
     }
 
     // ── Racing seed ────────────────────────────────────────────────────────────
@@ -248,13 +411,13 @@ public class DataInitializer implements CommandLineRunner {
     private void seedRacing() {
         // Velocity Grid: Mediterranean squad (IT/PT/MX/MA/NL), pts=9, 3W-5L
         // Nitro Kings: Northern European powerhouse (DE/SE/RU/JP/GH), pts=15, 5W-3L
-        Team velocity = team("Velocity Grid", 9,  3, 0, 5);
-        Team nitro    = team("Nitro Kings",  15,  5, 0, 3);
+        Team velocity = team("Velocity Grid", 9,  3, 5); velocity.setNationality("Italy");       velocity.setGame("RACING"); velocity.setTrophies(1); velocity.setCity("Turin");     velocity.setFoundedYear(2022); velocity.setCoachHistory(new ArrayList<>(List.of("Marco Ferrari (2022–2023)")));
+        Team nitro    = team("Nitro Kings",  15,  5, 3); nitro.setNationality("Germany");        nitro.setGame("RACING");    nitro.setTrophies(1); nitro.setCity("Munich");        nitro.setFoundedYear(2021);
         teamRepo.saveAll(List.of(velocity, nitro));
 
         coachRepo.saveAll(List.of(
-            coach("Alessandro Romano", "a.romano@velocitygrid.gg", velocity),
-            coach("Hans Brauer",       "h.brauer@nitrokings.gg",   nitro)
+            coach("Alessandro Romano", "a.romano@velocitygrid.gg", velocity, "Italy",   "Turin",     "1983-06-20", "RACING"),
+            coach("Hans Brauer",       "h.brauer@nitrokings.gg",   nitro,    "Germany", "Frankfurt", "1984-12-03", "RACING")
         ));
 
         // avgPosition, podiums, fastestLaps, dnf — career stats across the full season
@@ -300,13 +463,13 @@ public class DataInitializer implements CommandLineRunner {
     private void seedBattleRoyale() {
         // Drop Zone: LatAm/South Asia squad (BR/AR/CO/IN/NG), pts=6, 2W-3L
         // Zone Control: East/South-East Asian powerhouse (KR/CN/JP/BD/UA), pts=9, 3W-2L
-        Team dropZone    = team("Drop Zone",    6,  2, 0, 3);
-        Team zoneControl = team("Zone Control", 9,  3, 0, 2);
+        Team dropZone    = team("Drop Zone",    6,  2, 3); dropZone.setNationality("Brazil");       dropZone.setGame("BATTLE_ROYALE");    dropZone.setTrophies(1); dropZone.setCity("São Paulo"); dropZone.setFoundedYear(2023);
+        Team zoneControl = team("Zone Control", 9,  3, 2); zoneControl.setNationality("South Korea"); zoneControl.setGame("BATTLE_ROYALE"); zoneControl.setTrophies(1); zoneControl.setCity("Seoul"); zoneControl.setFoundedYear(2022);
         teamRepo.saveAll(List.of(dropZone, zoneControl));
 
         coachRepo.saveAll(List.of(
-            coach("Rafael Souza", "r.souza@dropzone.gg",    dropZone),
-            coach("Ji-ho Cho",    "j.cho@zonecontrol.gg",   zoneControl)
+            coach("Rafael Souza", "r.souza@dropzone.gg",  dropZone,    "Brazil",      "São Paulo", "1989-08-17", "BATTLE_ROYALE"),
+            coach("Ji-ho Cho",    "j.cho@zonecontrol.gg", zoneControl, "South Korea", "Incheon",  "1992-05-25", "BATTLE_ROYALE")
         ));
 
         // avgPlacement, kills, top10Rate (%), damagePerMatch
@@ -345,18 +508,86 @@ public class DataInitializer implements CommandLineRunner {
         teamRepo.saveAll(List.of(dropZone, zoneControl));
     }
 
+    // ── More upcoming matches seed ─────────────────────────────────────────────
+
+    private void seedMoreUpcoming() {
+        List<Team>       allTeams = teamRepo.findAll();
+        List<Tournament> allTs    = tournamentRepo.findAll();
+
+        Team nexus    = findTeam(allTeams, "Team Nexus");
+        Team phantom  = findTeam(allTeams, "Phantom Squad");
+        Team storm    = findTeam(allTeams, "Storm Raiders");
+        Team iron     = findTeam(allTeams, "Iron Wolves");
+        Team echo     = findTeam(allTeams, "Echo Strike");
+        Team apex     = findTeam(allTeams, "Apex Horizon");
+        Team velocity = findTeam(allTeams, "Velocity Grid");
+        Team nitro    = findTeam(allTeams, "Nitro Kings");
+        Team dropZone = findTeam(allTeams, "Drop Zone");
+        Team zoneCtrl = findTeam(allTeams, "Zone Control");
+
+        Tournament valorant  = findTourney(allTs, "Valorant Spring Cup 2026");
+        Tournament lol       = findTourney(allTs, "LoL Summer League 2026");
+        Tournament fifa      = findTourney(allTs, "FIFA eLeague 2026");
+        Tournament simRacing = findTourney(allTs, "SimRacing Pro League 2026");
+        Tournament brSeries  = findTourney(allTs, "Battle Royale World Series 2026");
+
+        List<Match> toAdd = new ArrayList<>();
+
+        // FPS: 2 more → total 4
+        if (valorant != null && nexus != null && phantom != null && storm != null) {
+            toAdd.add(upcoming(storm,    nexus,    "2026-06-17", valorant));
+            toAdd.add(upcoming(phantom,  nexus,    "2026-06-20", valorant));
+        }
+        // MOBA: 2 more → total 4
+        if (lol != null && nexus != null && iron != null && echo != null) {
+            toAdd.add(upcoming(nexus,    echo,     "2026-06-18", lol));
+            toAdd.add(upcoming(iron,     nexus,    "2026-06-22", lol));
+        }
+        // eFootball: 3 more → total 4
+        if (fifa != null && apex != null && storm != null) {
+            toAdd.add(upcoming(storm,    apex,     "2026-07-08", fifa));
+            toAdd.add(upcoming(apex,     storm,    "2026-07-12", fifa));
+            toAdd.add(upcoming(storm,    apex,     "2026-07-15", fifa));
+        }
+        // Racing: 2 more → total 4
+        if (simRacing != null && velocity != null && nitro != null) {
+            toAdd.add(upcoming(velocity, nitro,    "2026-07-05", simRacing));
+            toAdd.add(upcoming(nitro,    velocity, "2026-07-12", simRacing));
+        }
+        // BR: 1 more → total 4
+        if (brSeries != null && dropZone != null && zoneCtrl != null) {
+            toAdd.add(upcoming(zoneCtrl, dropZone, "2026-07-05", brSeries));
+        }
+
+        if (!toAdd.isEmpty()) matchRepo.saveAll(toAdd);
+    }
+
+    private Team findTeam(List<Team> teams, String name) {
+        return teams.stream().filter(t -> name.equals(t.getName())).findFirst().orElse(null);
+    }
+
+    private Tournament findTourney(List<Tournament> ts, String name) {
+        return ts.stream().filter(t -> name.equals(t.getName())).findFirst().orElse(null);
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private Team team(String name, int pts, int w, int d, int l) {
+    private Team team(String name, int pts, int w, int l) {
         Team t = new Team(name);
-        t.setPoints(pts); t.setWins(w); t.setDraws(d); t.setLosses(l);
+        t.setPoints(pts); t.setWins(w); t.setLosses(l);
         return t;
     }
 
-    private Coach coach(String name, String email, Team team) {
+    private Coach coach(String name, String email, Team team, String nationality, String city, String birthDate, String specialization) {
         Coach c = new Coach(name, email, "password");
         c.setTeam(team);
         team.setCoach(c);
+        c.setNationality(nationality);
+        c.setCity(city);
+        c.setBirthDate(LocalDate.parse(birthDate));
+        c.setSpecialization(specialization);
+        List<String> ach = COACH_ACHIEVEMENTS.get(name);
+        if (ach != null) c.setAchievements(new ArrayList<>(ach));
         return c;
     }
 
@@ -397,11 +628,71 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private Tournament tournament(String name, String game, String status, String startDate, Team... teams) {
+        return tournament(name, game, inferSpecificGame(name, game), "LEAGUE", status, startDate, teams);
+    }
+
+    private Tournament tournament(String name, String game, String specificGame, String format, String status, String startDate, Team... teams) {
         Tournament t = new Tournament(name, game);
+        t.setSpecificGame(specificGame);
+        t.setFormat(format);
         t.setStatus(status);
         t.setStartDate(LocalDate.parse(startDate));
         for (Team team : teams) t.getParticipatingTeams().add(team);
         return t;
+    }
+
+    private String inferSpecificGame(String name, String game) {
+        String n = (name == null ? "" : name).toUpperCase();
+        String g = (game == null ? "" : game).toUpperCase();
+        if (n.contains("VALORANT"))                                               return "Valorant";
+        if (n.contains("LOL ") || n.startsWith("LOL"))                           return "League of Legends";
+        if (n.contains("FIFA"))                                                   return "FIFA";
+        if (n.contains("SIMRACING") || n.contains("SIM RACING"))                 return "iRacing";
+        if (n.contains("BATTLE ROYALE") || g.contains("ROYALE") || n.startsWith("BR ")) return "PUBG";
+        if (g.contains("FPS"))                                                   return "Valorant";
+        if (g.contains("MOBA"))                                                  return "League of Legends";
+        if (g.contains("EFOOTBALL") || g.contains("FOOTBALL"))                   return "FIFA";
+        if (g.contains("RACING"))                                                return "iRacing";
+        return game;
+    }
+
+    private void seedElimination() {
+        List<Team> allTeams = teamRepo.findAll();
+        Team nexus    = findTeam(allTeams, "Team Nexus");
+        Team storm    = findTeam(allTeams, "Storm Raiders");
+        Team phantom  = findTeam(allTeams, "Phantom Squad");
+        Team iron     = findTeam(allTeams, "Iron Wolves");
+        Team echo     = findTeam(allTeams, "Echo Strike");
+        Team dropZone = findTeam(allTeams, "Drop Zone");
+        Team zoneCtrl = findTeam(allTeams, "Zone Control");
+
+        // FPS — Single Elimination (Semi-Final + Grand Final)
+        if (nexus != null && storm != null && phantom != null) {
+            Tournament t1 = tournament("Valorant Spring Invitational 2026", "FPS", "Valorant", "SINGLE_ELIMINATION", "ACTIVE", "2026-06-01", phantom, nexus, storm);
+            tournamentRepo.save(t1);
+            matchRepo.saveAll(List.of(
+                played(storm, nexus, "2026-06-02", t1, 9, 13),
+                upcoming(phantom, nexus, "2026-06-25", t1)
+            ));
+        }
+
+        // MOBA — Single Elimination (Grand Final series)
+        if (iron != null && echo != null) {
+            Tournament t2 = tournament("LoL Knockout Cup 2026", "MOBA", "League of Legends", "SINGLE_ELIMINATION", "UPCOMING", "2026-07-20", iron, echo);
+            tournamentRepo.save(t2);
+            matchRepo.save(upcoming(iron, echo, "2026-07-20", t2));
+        }
+
+        // BR — Double Elimination
+        if (dropZone != null && zoneCtrl != null) {
+            Tournament t3 = tournament("BR Invitational 2026", "BattleRoyale", "PUBG", "DOUBLE_ELIMINATION", "UPCOMING", "2026-07-15", zoneCtrl, dropZone);
+            tournamentRepo.save(t3);
+            matchRepo.saveAll(List.of(
+                upcoming(zoneCtrl, dropZone, "2026-07-15", t3),
+                upcoming(dropZone, zoneCtrl, "2026-07-22", t3),
+                upcoming(zoneCtrl, dropZone, "2026-07-28", t3)
+            ));
+        }
     }
 
     private Match played(Team a, Team b, String date, Tournament t, int sa, int sb) {

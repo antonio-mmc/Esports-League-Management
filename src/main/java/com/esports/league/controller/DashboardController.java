@@ -46,13 +46,12 @@ public class DashboardController {
                 .thenComparingInt(Team::getWins).reversed())
             .limit(10)
             .map(t -> {
-                int total = t.getWins() + t.getDraws() + t.getLosses();
+                int total = t.getWins() + t.getLosses();
                 int wr = total > 0 ? Math.round((float) t.getWins() / total * 100) : 0;
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("id",       t.getId());
                 row.put("name",     t.getName());
                 row.put("wins",     t.getWins());
-                row.put("draws",    t.getDraws());
                 row.put("losses",   t.getLosses());
                 row.put("points",   t.getPoints());
                 row.put("winRate",  wr);
@@ -69,7 +68,6 @@ public class DashboardController {
                 int total = p.getWins() + p.getLosses();
                 return total > 0 ? (double) p.getWins() / total : 0;
             }).reversed())
-            .limit(10)
             .map(p -> {
                 int total = p.getWins() + p.getLosses();
                 int wr = total > 0 ? Math.round((float) p.getWins() / total * 100) : 0;
@@ -90,10 +88,13 @@ public class DashboardController {
     @GetMapping("/game-breakdown")
     public Map<String, Long> getGameBreakdown() {
         List<Player> all = playerRepository.findAll();
-        long fps       = all.stream().filter(p -> "FPS".equals(p.getPlayerType())).count();
-        long moba      = all.stream().filter(p -> "MOBA".equals(p.getPlayerType())).count();
-        long efootball = all.stream().filter(p -> "EFOOTBALL".equals(p.getPlayerType())).count();
-        long generic   = all.stream().filter(p -> "GENERIC".equals(p.getPlayerType())).count();
-        return Map.of("FPS", fps, "MOBA", moba, "EFOOTBALL", efootball, "GENERIC", generic);
+        long fps          = all.stream().filter(p -> "FPS".equals(p.getPlayerType())).count();
+        long moba         = all.stream().filter(p -> "MOBA".equals(p.getPlayerType())).count();
+        long efootball    = all.stream().filter(p -> "EFOOTBALL".equals(p.getPlayerType())).count();
+        long racing       = all.stream().filter(p -> "RACING".equals(p.getPlayerType())).count();
+        long battleRoyale = all.stream().filter(p -> "BATTLE_ROYALE".equals(p.getPlayerType())).count();
+        long generic      = all.stream().filter(p -> "GENERIC".equals(p.getPlayerType())).count();
+        return Map.of("FPS", fps, "MOBA", moba, "EFOOTBALL", efootball,
+                      "RACING", racing, "BATTLE_ROYALE", battleRoyale, "GENERIC", generic);
     }
 }

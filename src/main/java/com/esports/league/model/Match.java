@@ -75,12 +75,9 @@ public class Match {
         if (scoreA > scoreB) {
             teamA.registerWin();
             teamB.registerLoss();
-        } else if (scoreB > scoreA) {
+        } else {
             teamB.registerWin();
             teamA.registerLoss();
-        } else {
-            teamA.registerDraw();
-            teamB.registerDraw();
         }
     }
 }

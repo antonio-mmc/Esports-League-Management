@@ -7,10 +7,12 @@ import PageHeader from '../components/PageHeader'
 import Badge from '../components/Badge'
 import { GAME_FILTERS, useGameFilter } from '../context/GameFilterContext'
 import { dashboardApi, tournamentApi, matchApi, teamApi, coachApi } from '../services/api'
+import { teamEmoji } from '../utils/teamEmoji'
 
 const TYPE_COLOR = { FPS: '#06B6D4', MOBA: '#8B5CF6', EFOOTBALL: '#22C55E', RACING: '#F59E0B', BATTLE_ROYALE: '#EF4444', GENERIC: '#94A3B8' }
 const TYPE_LABEL = { FPS: 'FPS', MOBA: 'MOBA', EFOOTBALL: 'eFootball', RACING: 'Racing', BATTLE_ROYALE: 'Battle Royale', GENERIC: 'Generic' }
 const TYPE_BADGE = { FPS: 'cyan', MOBA: 'purple', EFOOTBALL: 'green', RACING: 'orange', BATTLE_ROYALE: 'red', GENERIC: 'gray' }
+const TYPE_EMOJI = { FPS: '🎯', MOBA: '⚔️', EFOOTBALL: '⚽', RACING: '🏎️', BATTLE_ROYALE: '💥', GENERIC: '🎮' }
 const STATUS_COLOR = { ACTIVE: 'green', FINISHED: 'gray', PENDING: 'cyan', UPCOMING: 'cyan' }
 
 function matchesGame(tournamentGame, filterKey) {
@@ -65,6 +67,47 @@ export default function Dashboard() {
     gameFilter === 'ALL' ? topPlayers : topPlayers.filter(p => p.playerType === gameFilter),
   [topPlayers, gameFilter])
 
+  const MODE_ORDER = ['FPS', 'MOBA', 'EFOOTBALL', 'RACING', 'BATTLE_ROYALE']
+
+  const getDominantType = (team) => {
+    const counts = {}
+    ;(team.players || []).forEach(p => {
+      if (p.playerType) counts[p.playerType] = (counts[p.playerType] || 0) + 1
+    })
+    return Object.entries(counts).sort(([, a], [, b]) => b - a)[0]?.[0] ?? null
+  }
+
+  // ALL view: 1 best per discipline in fixed MODE_ORDER (all three widgets stay aligned)
+  const allViewTopPlayers = useMemo(() =>
+    MODE_ORDER
+      .map(type => topPlayers.find(p => p.playerType === type))
+      .filter(Boolean),
+  [topPlayers])
+
+  const allViewTopTeams = useMemo(() =>
+    MODE_ORDER.map(type => {
+      const ofType = teams.filter(t => getDominantType(t) === type)
+      return [...ofType].sort((a, b) => (b.points || 0) - (a.points || 0))[0]
+    }).filter(Boolean),
+  [teams])
+
+  const allViewTopCoaches = useMemo(() => {
+    const teamById = Object.fromEntries(teams.map(t => [t.id, t]))
+    return MODE_ORDER.map(type => {
+      const ofType = coaches.filter(c => {
+        const team = teamById[c.team?.id]
+        return team && getDominantType(team) === type
+      })
+      const best = [...ofType].sort((a, b) => {
+        const ta = teamById[a.team?.id]
+        const tb = teamById[b.team?.id]
+        return (tb?.points || 0) - (ta?.points || 0)
+      })[0]
+      if (!best) return null
+      return { ...best, _team: teamById[best.team?.id] }
+    }).filter(Boolean)
+  }, [coaches, teams])
+
   const filteredTournaments = useMemo(() =>
     tournaments
       .filter(t => matchesGame(t.game, gameFilter))
@@ -84,14 +127,14 @@ export default function Dashboard() {
     filteredMatches
       .filter(m => m.resultRecorded)
       .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 5),
+      .slice(0, 4),
   [filteredMatches])
 
   const nextMatches = useMemo(() =>
     filteredMatches
       .filter(m => !m.resultRecorded)
       .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .slice(0, 5),
+      .slice(0, 4),
   [filteredMatches])
 
   const filteredStats = useMemo(() => {
@@ -167,7 +210,16 @@ export default function Dashboard() {
 
   return (
     <div className="animate-fade-in">
-      <PageHeader title="Dashboard" subtitle="League overview" />
+      <PageHeader
+        title="Dashboard"
+        subtitle={gameFilter === 'ALL' ? 'Season 2026 · All Disciplines' : 'Season 2026'}
+        badge={gameFilter !== 'ALL' && (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md font-body text-sm font-semibold self-center"
+            style={{ background: `${TYPE_COLOR[gameFilter]}18`, color: TYPE_COLOR[gameFilter], border: `1px solid ${TYPE_COLOR[gameFilter]}40` }}>
+            {TYPE_EMOJI[gameFilter]} {TYPE_LABEL[gameFilter]}
+          </span>
+        )}
+      />
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -190,14 +242,14 @@ export default function Dashboard() {
                 {/* Top Players */}
                 <div className="glass-card p-5">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-display text-sm text-text-primary tracking-wide uppercase">Top Players</h3>
+                    <h3 className="font-display text-sm text-text-primary tracking-wide uppercase flex items-center gap-2"><Users size={14} className="text-text-dim" />Top Players</h3>
                     <Link to="/players" className="font-body text-xs text-accent-green hover:underline cursor-pointer">View all</Link>
                   </div>
-                  {topPlayers.length === 0 && !loading ? (
+                  {allViewTopPlayers.length === 0 && !loading ? (
                     <p className="text-sm text-text-dim font-body text-center py-8">Minimum 3 matches to appear.</p>
                   ) : (
                     <div className="space-y-1">
-                      {topPlayers.slice(0, 5).map((p, i) => (
+                      {allViewTopPlayers.map((p, i) => (
                         <div key={p.id} className="flex items-center gap-3 py-1 px-3 rounded-lg hover:bg-bg-primary transition-colors duration-150">
                           <span className="font-display text-xs w-4 text-text-dim">{i + 1}</span>
                           <div className="min-w-0 flex-1">
@@ -217,36 +269,29 @@ export default function Dashboard() {
                 {/* Top Teams */}
                 <div className="glass-card p-5">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-display text-sm text-text-primary tracking-wide uppercase">Top Teams</h3>
+                    <h3 className="font-display text-sm text-text-primary tracking-wide uppercase flex items-center gap-2"><Shield size={14} className="text-text-dim" />Top Teams</h3>
                     <Link to="/teams" className="font-body text-xs text-accent-green hover:underline cursor-pointer">View all</Link>
                   </div>
-                  {topTeams.length === 0 && !loading ? (
+                  {allViewTopTeams.length === 0 && !loading ? (
                     <p className="text-sm text-text-dim font-body text-center py-8">No teams yet.</p>
                   ) : (
                     <div className="space-y-1">
-                      {topTeams.map((t, i) => {
-                        const total = (t.wins || 0) + (t.draws || 0) + (t.losses || 0)
-                        const wr    = total > 0 ? Math.round((t.wins / total) * 100) : 0
-                        const typeCounts = {}
-                        ;(t.players || []).forEach(p => {
-                          if (p.playerType) typeCounts[p.playerType] = (typeCounts[p.playerType] || 0) + 1
-                        })
-                        const modeLabel = Object.entries(typeCounts)
-                          .sort(([, a], [, b]) => b - a)
-                          .map(([ty]) => TYPE_LABEL[ty] || ty)
-                          .join(' · ') || '—'
+                      {allViewTopTeams.map((t, i) => {
+                        const total    = (t.wins || 0) + (t.losses || 0)
+                        const wr       = total > 0 ? Math.round((t.wins / total) * 100) : 0
+                        const dom      = getDominantType(t)
+                        const modeCol  = TYPE_COLOR[dom] || '#94A3B8'
+                        const modeLbl  = TYPE_LABEL[dom] || dom || '—'
                         return (
                           <Link key={t.id} to={`/teams/${t.id}`}
                             className="flex items-center gap-3 py-1 px-3 rounded-lg hover:bg-bg-primary transition-colors duration-150">
-                            <span className={`font-display text-xs w-4 flex-shrink-0 ${i === 0 ? 'text-accent-green' : i === 1 ? 'text-text-muted' : i === 2 ? 'text-accent-cyan' : 'text-text-dim'}`}>
-                              {i + 1}
-                            </span>
-                            <div className="w-6 h-6 rounded bg-accent-cyan/10 flex items-center justify-center flex-shrink-0">
-                              <Shield size={11} className="text-accent-cyan" />
+                            <span className="font-display text-xs w-4 flex-shrink-0 text-text-dim">{i + 1}</span>
+                            <div className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 text-sm leading-none bg-bg-primary">
+                              {teamEmoji(t.name)}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="font-body text-sm text-text-primary font-semibold truncate">{t.name}</p>
-                              <p className="font-body text-xs text-text-dim truncate">{modeLabel}</p>
+                              <p className="font-body text-xs text-text-dim truncate">{modeLbl}</p>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <Badge variant="green">{t.points ?? 0}</Badge>
@@ -262,31 +307,31 @@ export default function Dashboard() {
                 {/* Top Coaches */}
                 <div className="glass-card p-5">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-display text-sm text-text-primary tracking-wide uppercase">Top Coaches</h3>
+                    <h3 className="font-display text-sm text-text-primary tracking-wide uppercase flex items-center gap-2"><UserCheck size={14} className="text-text-dim" />Top Coaches</h3>
                     <Link to="/coaches" className="font-body text-xs text-accent-green hover:underline cursor-pointer">View all</Link>
                   </div>
-                  {topCoaches.length === 0 && !loading ? (
+                  {allViewTopCoaches.length === 0 && !loading ? (
                     <p className="text-sm text-text-dim font-body text-center py-8">No coaches yet.</p>
                   ) : (
                     <div className="space-y-1">
-                      {topCoaches.map((c, i) => {
-                        const total = (c.team?.wins || 0) + (c.team?.draws || 0) + (c.team?.losses || 0)
-                        const wr    = total > 0 ? Math.round((c.team.wins / total) * 100) : null
+                      {allViewTopCoaches.map((c, i) => {
+                        const team  = c._team
+                        const total = (team?.wins || 0) + (team?.losses || 0)
+                        const wr    = total > 0 ? Math.round((team.wins / total) * 100) : null
+                        const dom   = getDominantType(team)
                         return (
                           <div key={c.id} className="flex items-center gap-3 py-1 px-3 rounded-lg hover:bg-bg-primary transition-colors duration-150">
-                            <span className={`font-display text-xs w-4 flex-shrink-0 ${i === 0 ? 'text-accent-green' : i === 1 ? 'text-text-muted' : i === 2 ? 'text-accent-cyan' : 'text-text-dim'}`}>
-                              {i + 1}
-                            </span>
-                            <div className="w-6 h-6 rounded bg-accent-green/10 flex items-center justify-center flex-shrink-0">
-                              <UserCheck size={11} className="text-accent-green" />
-                            </div>
+                            <span className="font-display text-xs w-4 flex-shrink-0 text-text-dim">{i + 1}</span>
                             <div className="min-w-0 flex-1">
                               <p className="font-body text-sm text-text-primary font-semibold truncate">{c.name}</p>
-                              <p className="font-body text-xs text-text-dim truncate">{c.team?.name || '—'}</p>
+                              <p className="font-body text-xs text-text-dim truncate">{team?.name || '—'}</p>
                             </div>
-                            {wr !== null && (
-                              <span className="font-body text-xs font-semibold text-accent-green flex-shrink-0">{wr}%</span>
-                            )}
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <Badge variant={TYPE_BADGE[dom] || 'gray'}>{TYPE_LABEL[dom] || dom}</Badge>
+                              {wr !== null && (
+                                <span className="font-body text-xs font-semibold text-accent-green w-8 text-right">{wr}%</span>
+                              )}
+                            </div>
                           </div>
                         )
                       })}
@@ -384,11 +429,15 @@ export default function Dashboard() {
                         return (
                           <div key={m.id} className="px-3 py-2.5 rounded-lg hover:bg-bg-primary transition-colors duration-150">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="font-body text-xs font-semibold text-text-primary truncate flex-1">{m.teamA?.name}</span>
+                              <span className="font-body text-xs font-semibold text-text-primary truncate flex-1 flex items-center gap-1">
+                                <span className="text-sm leading-none flex-shrink-0">{teamEmoji(m.teamA?.name)}</span>{m.teamA?.name}
+                              </span>
                               <span className="font-display text-sm font-bold text-text-primary flex-shrink-0 px-2">
                                 {m.teamAScore} <span className="text-text-dim text-xs font-body">:</span> {m.teamBScore}
                               </span>
-                              <span className="font-body text-xs font-semibold text-text-primary truncate flex-1 text-right">{m.teamB?.name}</span>
+                              <span className="font-body text-xs font-semibold text-text-primary truncate flex-1 text-right flex items-center justify-end gap-1">
+                                {m.teamB?.name}<span className="text-sm leading-none flex-shrink-0">{teamEmoji(m.teamB?.name)}</span>
+                              </span>
                             </div>
                             <div className="flex justify-between items-center mt-1">
                               <span className="font-body text-xs text-text-dim">{m.date}</span>
@@ -416,9 +465,13 @@ export default function Dashboard() {
                       {nextMatches.map(m => (
                         <div key={m.id} className="px-3 py-2.5 rounded-lg hover:bg-bg-primary transition-colors duration-150">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-body text-xs font-semibold text-text-primary truncate flex-1">{m.teamA?.name}</span>
+                            <span className="font-body text-xs font-semibold text-text-primary truncate flex-1 flex items-center gap-1">
+                              <span className="text-sm leading-none flex-shrink-0">{teamEmoji(m.teamA?.name)}</span>{m.teamA?.name}
+                            </span>
                             <span className="font-body text-xs text-text-dim flex-shrink-0 px-2">vs</span>
-                            <span className="font-body text-xs font-semibold text-text-primary truncate flex-1 text-right">{m.teamB?.name}</span>
+                            <span className="font-body text-xs font-semibold text-text-primary truncate flex-1 text-right flex items-center justify-end gap-1">
+                              {m.teamB?.name}<span className="text-sm leading-none flex-shrink-0">{teamEmoji(m.teamB?.name)}</span>
+                            </span>
                           </div>
                           <div className="flex justify-between items-center mt-1">
                             <span className="font-body text-xs text-text-dim">{m.date}</span>
@@ -442,7 +495,7 @@ export default function Dashboard() {
                     <p className="text-sm text-text-dim font-body text-center py-8">Minimum 3 matches to appear.</p>
                   ) : (
                     <div className="space-y-2">
-                      {filteredTopPlayers.slice(0, 6).map((p, i) => (
+                      {filteredTopPlayers.slice(0, 5).map((p, i) => (
                         <div key={p.id} className="flex items-center gap-3 py-1.5 px-3 rounded-lg hover:bg-bg-primary transition-colors duration-150">
                           <span className="font-display text-xs w-4 text-text-dim">{i + 1}</span>
                           <div className="min-w-0 flex-1">

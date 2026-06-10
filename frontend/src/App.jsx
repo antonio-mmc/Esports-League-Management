@@ -8,6 +8,7 @@ import Coaches     from './pages/Coaches'
 import Teams       from './pages/Teams'
 import PlayerDetail      from './pages/PlayerDetail'
 import TeamDetail        from './pages/TeamDetail'
+import CoachDetail       from './pages/CoachDetail'
 import Tournaments       from './pages/Tournaments'
 import TournamentDetail  from './pages/TournamentDetail'
 import Matches     from './pages/Matches'
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/players"     element={<Players />}     />
             <Route path="/players/:id" element={<PlayerDetail />} />
             <Route path="/coaches"     element={<Coaches />}     />
+            <Route path="/coaches/:id" element={<CoachDetail />} />
             <Route path="/teams"       element={<Teams />}       />
             <Route path="/teams/:id"   element={<TeamDetail />}  />
             <Route path="/tournaments"     element={<Tournaments />}      />

@@ -9,6 +9,7 @@ import Badge from '../components/Badge'
 import Modal from '../components/Modal'
 import { useToast } from '../components/Toast'
 import { playerApi, teamApi } from '../services/api'
+import { teamEmoji } from '../utils/teamEmoji'
 
 const TYPE_COLOR = { FPS: '#06B6D4', MOBA: '#8B5CF6', EFOOTBALL: '#22C55E', RACING: '#F59E0B', BATTLE_ROYALE: '#EF4444' }
 const TYPE_BADGE = { FPS: 'cyan',    MOBA: 'purple',  EFOOTBALL: 'green',   RACING: 'orange', BATTLE_ROYALE: 'red'    }
@@ -268,8 +269,8 @@ export default function PlayerDetail() {
               </div>
               <p className="font-body text-sm text-text-muted">{player.fullName}</p>
               {player.team && (
-                <Link to={`/teams/${player.team.id}`} className="font-body text-xs text-accent-green hover:underline mt-0.5 block">
-                  {player.team.name}
+                <Link to={`/teams/${player.team.id}`} className="font-body text-xs text-accent-green hover:underline mt-0.5 inline-flex items-center gap-1">
+                  <span>{teamEmoji(player.team.name)}</span>{player.team.name}
                 </Link>
               )}
             </div>
@@ -434,8 +435,8 @@ export default function PlayerDetail() {
                 {player.team && (
                   <ProfileRow icon={Users} label="Team">
                     <Link to={`/teams/${player.team.id}`}
-                      className="font-body text-sm text-accent-green hover:underline">
-                      {player.team.name}
+                      className="font-body text-sm text-accent-green hover:underline inline-flex items-center gap-1.5">
+                      <span>{teamEmoji(player.team.name)}</span>{player.team.name}
                     </Link>
                   </ProfileRow>
                 )}

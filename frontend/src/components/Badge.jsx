@@ -5,6 +5,7 @@ const variants = {
   purple: 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20',
   gray:   'bg-bg-border/40 text-text-muted border border-bg-border',
   orange: 'bg-orange-500/10 text-orange-400 border border-orange-500/20',
+  amber:  'bg-amber-500/10 text-amber-400 border border-amber-500/20',
   red:    'bg-red-500/10 text-red-400 border border-red-500/20',
 }
 

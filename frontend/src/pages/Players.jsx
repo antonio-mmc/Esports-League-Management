@@ -9,6 +9,7 @@ import Badge from '../components/Badge'
 import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
 import { playerApi, teamApi } from '../services/api'
+import { teamEmoji } from '../utils/teamEmoji'
 
 const TYPE_META = {
   FPS:          { label: 'FPS',          color: 'cyan',   icon: Crosshair,  hex: '#06B6D4' },
@@ -29,6 +30,10 @@ const COUNTRY_CODE = {
   'India': 'IN', 'Nigeria': 'NG', 'Ukraine': 'UA', 'China': 'CN',
   'Bangladesh': 'BD',
 }
+const flagEmoji = code => code
+  ? code.toUpperCase().split('').map(c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)).join('')
+  : ''
+
 function FlagIcon({ nationality, size = 16 }) {
   const code = COUNTRY_CODE[nationality]
   if (!code) return null
@@ -227,7 +232,7 @@ export default function Players() {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const modeOptions = [
-    { value: 'ALL',          label: 'All Modes'    },
+    { value: 'ALL',          label: 'All Games'    },
     { value: 'FPS',          label: 'FPS'          },
     { value: 'MOBA',         label: 'MOBA'         },
     { value: 'EFOOTBALL',    label: 'eFootball'    },
@@ -236,22 +241,24 @@ export default function Players() {
   ]
 
   const teamOptions = useMemo(() => [
-    { value: '', label: 'All Teams' },
-    ...teams.map(t => ({ value: String(t.id), label: t.name })),
+    { value: '',     label: 'All Teams'   },
+    { value: 'FREE', label: 'Free Agents' },
+    ...teams.map(t => ({ value: String(t.id), label: `${teamEmoji(t.name)} ${t.name}` })),
   ], [teams])
 
   const nationalityOptions = useMemo(() => {
     const nations = [...new Set(players.map(p => p.nationality).filter(Boolean))].sort()
     return [
       { value: '', label: 'All Nations' },
-      ...nations.map(n => ({ value: n, label: n })),
+      ...nations.map(n => ({ value: n, label: `${flagEmoji(COUNTRY_CODE[n])} ${n}`.trim() })),
     ]
   }, [players])
 
   const filtered = useMemo(() => {
     let result = players
     if (filter !== 'ALL')       result = result.filter(p => (p.playerType || '').toUpperCase() === filter)
-    if (teamFilter)             result = result.filter(p => String(p.team?.id) === teamFilter)
+    if (teamFilter === 'FREE')  result = result.filter(p => !p.team)
+    else if (teamFilter)        result = result.filter(p => String(p.team?.id) === teamFilter)
     if (nationalityFilter)      result = result.filter(p => p.nationality === nationalityFilter)
     if (ageMin || ageMax) {
       result = result.filter(p => {
@@ -335,7 +342,10 @@ export default function Players() {
     { key: 'matchesPlayed', label: 'Matches', sortable: true },
     { key: 'wins',          label: 'W',       sortable: true },
     { key: 'losses',        label: 'L',       sortable: true },
-    { key: 'team',          label: 'Team',    sortable: true, render: (v) => v?.name || <span className="text-text-dim">—</span> },
+    { key: 'team',          label: 'Team',    sortable: true, render: (v) => v?.name
+      ? <span className="flex items-center gap-1.5"><span>{teamEmoji(v.name)}</span>{v.name}</span>
+      : <span className="text-sm font-semibold px-2 py-0.5 rounded-full font-body bg-bg-border/40 text-text-muted border border-bg-border">Free</span>
+    },
     { key: '_actions', label: '', render: (_, r) => (
       <div className="flex items-center gap-1">
         <button onClick={() => navigate(`/players/${r.id}`)} className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-primary transition-all duration-150 cursor-pointer">
@@ -365,7 +375,7 @@ export default function Players() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-5">
-        <Combobox value={filter}            onChange={setFilter}            options={modeOptions}         placeholder="All Modes"   style={{ width: 160 }} />
+        <Combobox value={filter}            onChange={setFilter}            options={modeOptions}         placeholder="All Games"   style={{ width: 160 }} />
         <Combobox value={teamFilter}        onChange={setTeamFilter}        options={teamOptions}         placeholder="All Teams"   style={{ width: 160 }} />
         <Combobox value={nationalityFilter} onChange={setNationalityFilter} options={nationalityOptions}  placeholder="All Nations" style={{ width: 160 }} />
         <AgeFilter ageMin={ageMin} ageMax={ageMax} onChange={(min, max) => { setAgeMin(min); setAgeMax(max) }} />

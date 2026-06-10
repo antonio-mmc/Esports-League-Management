@@ -7,6 +7,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "teams")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Team {
 
     @Id
@@ -16,10 +17,21 @@ public class Team {
     @Column(nullable = false, unique = true)
     private String name;
 
+    private String nationality;
+    private String game;
+    private Integer foundedYear;
+    private String city;
+
     private int wins;
-    private int draws;
     private int losses;
     private int points;
+    @Column(columnDefinition = "integer default 0")
+    private int trophies;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "team_coach_history", joinColumns = @JoinColumn(name = "team_id"))
+    @Column(name = "coach_entry")
+    private List<String> coachHistory = new ArrayList<>();
 
     @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnoreProperties("team")
@@ -46,11 +58,26 @@ public class Team {
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
+    public String getNationality() { return nationality; }
+    public void setNationality(String nationality) { this.nationality = nationality; }
+
+    public String getGame() { return game; }
+    public void setGame(String game) { this.game = game; }
+
+    public int getTrophies() { return trophies; }
+    public void setTrophies(int trophies) { this.trophies = trophies; }
+
+    public Integer getFoundedYear() { return foundedYear; }
+    public void setFoundedYear(Integer foundedYear) { this.foundedYear = foundedYear; }
+
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
+
+    public List<String> getCoachHistory() { return coachHistory; }
+    public void setCoachHistory(List<String> coachHistory) { this.coachHistory = coachHistory; }
+
     public int getWins() { return wins; }
     public void setWins(int wins) { this.wins = wins; }
-
-    public int getDraws() { return draws; }
-    public void setDraws(int draws) { this.draws = draws; }
 
     public int getLosses() { return losses; }
     public void setLosses(int losses) { this.losses = losses; }
@@ -72,16 +99,11 @@ public class Team {
         recalcPoints();
     }
 
-    public void registerDraw() {
-        draws++;
-        recalcPoints();
-    }
-
     public void registerLoss() {
         losses++;
     }
 
     private void recalcPoints() {
-        this.points = wins * 3 + draws;
+        this.points = wins * 3;
     }
 }

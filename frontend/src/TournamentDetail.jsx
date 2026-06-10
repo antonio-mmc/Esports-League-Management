@@ -29,7 +29,8 @@ function getRoundLabel(format, index, total) {
   if (!format || format === 'LEAGUE') return null
   if (format === 'SINGLE_ELIMINATION') {
     if (index === total - 1) return 'Grand Final'
-    return 'Semi-Final'
+    if (total === 2) return 'Semi-Final'
+    return `Round ${index + 1}`
   }
   if (format === 'DOUBLE_ELIMINATION') {
     const labels = ['Winners Final', 'Losers Final', 'Grand Final']
@@ -118,7 +119,7 @@ export default function TournamentDetail() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Teams */}
+        {/* Teams — standings for league, participants list for elimination */}
         <div className="lg:col-span-2 glass-card p-5">
           <div className="flex items-center gap-2 mb-5">
             <Shield size={15} className="text-accent-cyan" />
@@ -131,6 +132,7 @@ export default function TournamentDetail() {
           {teams.length === 0 ? (
             <p className="text-sm text-text-dim font-body text-center py-10">No teams registered.</p>
           ) : isElim ? (
+            /* Elimination: plain participants list */
             <div className="space-y-2">
               {teams.map((t) => (
                 <Link key={t.id} to={`/teams/${t.id}`}
@@ -145,6 +147,7 @@ export default function TournamentDetail() {
               ))}
             </div>
           ) : (
+            /* League: standings with points */
             <div className="space-y-2">
               {sortedTeams.map((t, i) => {
                 const total   = (t.wins || 0) + (t.losses || 0)

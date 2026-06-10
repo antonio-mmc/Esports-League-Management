@@ -1,11 +1,110 @@
-import { useEffect, useState, useMemo } from 'react'
-import { Plus, Trash2, Edit2, UserCheck } from 'lucide-react'
-import { useSearchParams } from 'react-router-dom'
+import { useEffect, useState, useMemo, useRef } from 'react'
+import { Plus, UserCheck, Crosshair, Sword, Footprints, Car, Skull, Trash2, Edit2, Search, X, ChevronRight, ChevronDown } from 'lucide-react'
+import { useSearchParams, Link, useNavigate } from 'react-router-dom'
+import { useGameFilter } from '../context/GameFilterContext'
 import PageHeader from '../components/PageHeader'
 import DataTable from '../components/DataTable'
 import Modal from '../components/Modal'
+import Badge from '../components/Badge'
+import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
 import { coachApi, teamApi } from '../services/api'
+import { teamEmoji } from '../utils/teamEmoji'
+
+const TYPE_META = {
+  FPS:          { label: 'FPS',          color: 'cyan',   icon: Crosshair,  hex: '#06B6D4' },
+  MOBA:         { label: 'MOBA',         color: 'purple', icon: Sword,      hex: '#8B5CF6' },
+  EFOOTBALL:    { label: 'eFootball',    color: 'green',  icon: Footprints, hex: '#22C55E' },
+  RACING:       { label: 'Racing',       color: 'orange', icon: Car,        hex: '#F59E0B' },
+  BATTLE_ROYALE:{ label: 'Battle Royale',color: 'red',    icon: Skull,      hex: '#EF4444' },
+}
+
+const COUNTRY_CODE = {
+  'Portugal': 'PT', 'Spain': 'ES', 'Japan': 'JP', 'Russia': 'RU',
+  'Ghana': 'GH', 'Denmark': 'DK', 'Sweden': 'SE', 'Italy': 'IT',
+  'Egypt': 'EG', 'France': 'FR', 'Brazil': 'BR', 'Germany': 'DE',
+  'South Korea': 'KR', 'Czech Republic': 'CZ', 'Senegal': 'SN',
+  'Ireland': 'IE', 'Croatia': 'HR', 'Lebanon': 'LB', 'Colombia': 'CO',
+  'Norway': 'NO', 'Pakistan': 'PK', 'USA': 'US', 'United Kingdom': 'GB',
+  'Mexico': 'MX', 'Morocco': 'MA', 'Netherlands': 'NL', 'Argentina': 'AR',
+  'India': 'IN', 'Nigeria': 'NG', 'Ukraine': 'UA', 'China': 'CN',
+  'Bangladesh': 'BD',
+}
+
+const flagEmoji = code => code
+  ? code.toUpperCase().split('').map(c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)).join('')
+  : ''
+
+function FlagIcon({ nationality, size = 16 }) {
+  const code = COUNTRY_CODE[nationality]
+  if (!code) return null
+  return <span className={`fi fi-${code.toLowerCase()}`} style={{ width: size, height: size * 0.75, borderRadius: 2, flexShrink: 0 }} />
+}
+
+function AgeFilter({ ageMin, ageMax, onChange }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const h = e => { if (!ref.current?.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  const hasFilter = ageMin || ageMax
+  const displayLabel = hasFilter
+    ? (ageMin && ageMax ? `${ageMin} – ${ageMax}` : ageMin ? `${ageMin}+` : `≤ ${ageMax}`)
+    : 'All Ages'
+
+  const clear = () => { onChange('', ''); setOpen(false) }
+
+  return (
+    <div ref={ref} className="relative" style={{ width: 160 }}>
+      <div
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-primary border border-bg-border cursor-pointer hover:border-accent-green/20 transition-colors duration-150">
+        <span className="font-body text-sm text-text-primary flex-1 select-none">{displayLabel}</span>
+        {hasFilter
+          ? <button onMouseDown={e => { e.preventDefault(); e.stopPropagation(); clear() }} className="text-text-dim hover:text-text-muted cursor-pointer"><X size={11} /></button>
+          : <ChevronDown size={12} className={`text-text-dim flex-shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
+        }
+      </div>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-50 rounded-xl border border-bg-border p-3"
+          style={{ background: 'rgba(9,15,29,0.98)', backdropFilter: 'blur(20px)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', width: 192 }}>
+          <p className="font-body text-xs text-text-dim uppercase tracking-wider mb-2.5">Age range</p>
+          <div className="flex items-center gap-2">
+            <input type="number" min="0" max="99" value={ageMin}
+              onChange={e => onChange(e.target.value, ageMax)}
+              placeholder="Min"
+              className="input-field text-center px-2" style={{ width: 72 }} />
+            <span className="font-body text-text-dim text-sm flex-shrink-0">–</span>
+            <input type="number" min="0" max="99" value={ageMax}
+              onChange={e => onChange(ageMin, e.target.value)}
+              placeholder="Max"
+              className="input-field text-center px-2" style={{ width: 72 }} />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const getAge = (birthDate) => {
+  if (!birthDate) return null
+  const today = new Date()
+  const birth = new Date(birthDate)
+  let age = today.getFullYear() - birth.getFullYear()
+  const m = today.getMonth() - birth.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--
+  return age
+}
+
+const emptyForm = {
+  name: '', email: '', teamId: '',
+  nationality: '', city: '', birthDate: '',
+  specialization: '', achievementsText: '',
+}
 
 function Field({ label, children }) {
   return (
@@ -16,8 +115,6 @@ function Field({ label, children }) {
   )
 }
 
-const emptyForm = { name: '', email: '', teamId: '' }
-
 export default function Coaches() {
   const [coaches, setCoaches] = useState([])
   const [teams, setTeams]     = useState([])
@@ -26,9 +123,33 @@ export default function Coaches() {
   const [editing, setEditing] = useState(null)
   const [form, setForm]       = useState(emptyForm)
   const [saving, setSaving]   = useState(false)
-  const [searchParams]        = useSearchParams()
-  const searchHighlight       = searchParams.get('q') || ''
+  const navigate = useNavigate()
+  const { gameFilter } = useGameFilter()
+  const [filter,            setFilter]           = useState('ALL')
+  const [teamFilter,        setTeamFilter]        = useState('')
+  const [nationalityFilter, setNationalityFilter] = useState('')
+  const [ageMin,            setAgeMin]            = useState('')
+  const [ageMax,            setAgeMax]            = useState('')
+  const [nameSearch,        setNameSearch]        = useState('')
+  const [sortKey,           setSortKey]           = useState(null)
+  const [sortDir,           setSortDir]           = useState('asc')
+  const [searchParams]                            = useSearchParams()
   const toast = useToast()
+
+  const NUMERIC_COLS = new Set(['age'])
+
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir(NUMERIC_COLS.has(key) ? 'desc' : 'asc')
+    }
+  }
+
+  useEffect(() => { setFilter(gameFilter) }, [gameFilter])
+
+  const searchHighlight = searchParams.get('q') || ''
 
   const load = async () => {
     setLoading(true)
@@ -43,16 +164,29 @@ export default function Coaches() {
   const openCreate = () => { setEditing(null); setForm(emptyForm); setModal(true) }
   const openEdit   = (c) => {
     setEditing(c)
-    setForm({ name: c.name || '', email: c.email || '', teamId: c.team?.id || '' })
+    setForm({
+      name: c.name || '', email: c.email || '', teamId: c.team?.id || '',
+      nationality: c.nationality || '', city: c.city || '',
+      birthDate: c.birthDate || '', specialization: c.specialization || '',
+      achievementsText: (c.achievements || []).join('\n'),
+    })
     setModal(true)
   }
 
   const handleSave = async () => {
     setSaving(true)
     try {
+      const achievements = form.achievementsText
+        ? form.achievementsText.split('\n').map(s => s.trim()).filter(Boolean)
+        : []
       const payload = {
         name: form.name, email: form.email,
-        ...(form.teamId ? { team: { id: Number(form.teamId) } } : {}),
+        nationality: form.nationality || null,
+        city: form.city || null,
+        birthDate: form.birthDate || null,
+        specialization: form.specialization || null,
+        achievements,
+        ...(form.teamId ? { team: { id: Number(form.teamId) } } : { team: null }),
       }
       if (editing) await coachApi.update(editing.id, payload)
       else         await coachApi.create(payload)
@@ -74,12 +208,82 @@ export default function Coaches() {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const displayCoaches = useMemo(() => {
-    if (!searchHighlight) return coaches
-    const q = searchHighlight.toLowerCase()
-    const isMatch = c => c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q)
-    return [...coaches.filter(isMatch), ...coaches.filter(c => !isMatch(c))]
-  }, [coaches, searchHighlight])
+  const getDominantType = (coach) => {
+    if (coach.specialization) return coach.specialization
+    // fallback: derive from team players if available
+    const team = teams.find(t => t.id === coach.team?.id)
+    if (!team) return null
+    const counts = {}
+    ;(team.players || []).forEach(p => {
+      if (p.playerType) counts[p.playerType] = (counts[p.playerType] || 0) + 1
+    })
+    return Object.entries(counts).sort(([, a], [, b]) => b - a)[0]?.[0] ?? null
+  }
+
+  const modeOptions = [
+    { value: 'ALL',          label: 'All Games'    },
+    { value: 'FPS',          label: 'FPS'          },
+    { value: 'MOBA',         label: 'MOBA'         },
+    { value: 'EFOOTBALL',    label: 'eFootball'    },
+    { value: 'RACING',       label: 'Racing'       },
+    { value: 'BATTLE_ROYALE',label: 'Battle Royale'},
+  ]
+
+  const teamOptions = useMemo(() => [
+    { value: '',     label: 'All Teams'   },
+    { value: 'FREE', label: 'Free Agents' },
+    ...teams.map(t => ({ value: String(t.id), label: `${teamEmoji(t.name)} ${t.name}` })),
+  ], [teams])
+
+  const nationalityOptions = useMemo(() => {
+    const nations = [...new Set(coaches.map(c => c.nationality).filter(Boolean))].sort()
+    return [
+      { value: '', label: 'All Nations' },
+      ...nations.map(n => ({ value: n, label: `${flagEmoji(COUNTRY_CODE[n])} ${n}`.trim() })),
+    ]
+  }, [coaches])
+
+  const filtered = useMemo(() => {
+    let result = coaches
+    if (filter !== 'ALL') result = result.filter(c => getDominantType(c) === filter)
+    if (teamFilter === 'FREE') result = result.filter(c => !c.team)
+    else if (teamFilter)       result = result.filter(c => String(c.team?.id) === teamFilter)
+    if (nationalityFilter)result = result.filter(c => c.nationality === nationalityFilter)
+    if (ageMin || ageMax) {
+      result = result.filter(c => {
+        const age = getAge(c.birthDate)
+        if (age === null) return false
+        if (ageMin && age < parseInt(ageMin)) return false
+        if (ageMax && age > parseInt(ageMax)) return false
+        return true
+      })
+    }
+    if (nameSearch.trim()) {
+      const q = nameSearch.toLowerCase()
+      result = result.filter(c => c.name?.toLowerCase().includes(q))
+    }
+    if (sortKey) {
+      const sortValue = (c) => {
+        if (sortKey === 'age')        return getAge(c.birthDate) ?? -1
+        if (sortKey === 'team')       return c.team?.name?.toLowerCase() || ''
+        if (sortKey === 'mode')       return getDominantType(c) || ''
+        if (sortKey === 'nationality')return (c.nationality || '').toLowerCase()
+        if (sortKey === 'name')       return (c.name || '').toLowerCase()
+        return c[sortKey] ?? ''
+      }
+      result = [...result].sort((a, b) => {
+        const av = sortValue(a), bv = sortValue(b)
+        const cmp = av < bv ? -1 : av > bv ? 1 : 0
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+    }
+    if (searchHighlight) {
+      const q = searchHighlight.toLowerCase()
+      const isMatch = c => c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q)
+      return [...result.filter(isMatch), ...result.filter(c => !isMatch(c))]
+    }
+    return result
+  }, [coaches, filter, teamFilter, nationalityFilter, ageMin, ageMax, nameSearch, searchHighlight, sortKey, sortDir, teams])
 
   const highlightFn = searchHighlight
     ? (row) => {
@@ -89,22 +293,52 @@ export default function Coaches() {
     : null
 
   const columns = [
-    { key: 'name', label: 'Name', render: (v) => (
-      <div className="flex items-center gap-2.5">
-        <div className="w-7 h-7 rounded-md bg-accent-green/10 flex items-center justify-center flex-shrink-0">
-          <UserCheck size={13} className="text-accent-green" />
-        </div>
-        <span className="font-semibold">{v}</span>
-      </div>
-    )},
-    { key: 'email', label: 'Email', render: v => <span className="text-text-muted">{v}</span> },
-    { key: 'team',  label: 'Team',  render: v => v?.name || <span className="text-text-dim">—</span> },
+    { key: 'name', label: 'Name', sortable: true, render: (v, r) => {
+      const mode = getDominantType(r)
+      const meta = TYPE_META[mode]
+      const hex  = meta?.hex || '#22C55E'
+      return (
+        <Link to={`/coaches/${r.id}`} className="flex items-center gap-2.5 hover:text-accent-green transition-colors duration-150">
+          <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
+            style={{ background: `${hex}1e` }}>
+            <UserCheck size={13} style={{ color: hex }} />
+          </div>
+          <span className="font-semibold">{v}</span>
+        </Link>
+      )
+    }},
+    { key: 'nationality', label: 'Nation', sortable: true, render: (v) => {
+      if (!v) return <span className="text-text-dim">—</span>
+      const code = COUNTRY_CODE[v] || v.slice(0, 3).toUpperCase()
+      return (
+        <span className="flex items-center gap-1.5">
+          <FlagIcon nationality={v} size={16} />
+          <span className="font-body text-xs text-text-muted font-medium tracking-wide">{code}</span>
+        </span>
+      )
+    }},
+    { key: 'age', label: 'Age', sortable: true, render: (_, r) => {
+      const age = getAge(r.birthDate)
+      return age != null ? <span className="font-body text-sm text-text-primary">{age}</span> : <span className="text-text-dim">—</span>
+    }},
+    { key: 'mode', label: 'Mode', sortable: true, render: (_, r) => {
+      const mode = getDominantType(r)
+      const m = TYPE_META[mode] || {}
+      return mode ? <Badge variant={m.color || 'gray'}>{m.label || mode}</Badge> : <span className="text-text-dim">—</span>
+    }},
+    { key: 'team', label: 'Team', sortable: true, render: (v) => v?.name
+      ? <span className="flex items-center gap-1.5"><span>{teamEmoji(v.name)}</span>{v.name}</span>
+      : <span className="text-sm font-semibold px-2 py-0.5 rounded-full font-body bg-bg-border/40 text-text-muted border border-bg-border">Free</span>
+    },
     { key: '_actions', label: '', render: (_, r) => (
       <div className="flex items-center gap-1">
-        <button onClick={() => openEdit(r)} className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-accent-cyan hover:bg-accent-cyan/10 transition-all duration-150 cursor-pointer">
+        <button onClick={() => navigate(`/coaches/${r.id}`)} className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-primary transition-all duration-150 cursor-pointer">
+          <ChevronRight size={13} />
+        </button>
+        <button onClick={(e) => { e.stopPropagation(); openEdit(r) }} className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-accent-cyan hover:bg-accent-cyan/10 transition-all duration-150 cursor-pointer">
           <Edit2 size={13} />
         </button>
-        <button onClick={() => handleDelete(r.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-all duration-150 cursor-pointer">
+        <button onClick={(e) => { e.stopPropagation(); handleDelete(r.id) }} className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-all duration-150 cursor-pointer">
           <Trash2 size={13} />
         </button>
       </div>
@@ -123,25 +357,80 @@ export default function Coaches() {
         }
       />
 
-      <DataTable columns={columns} data={displayCoaches} loading={loading} emptyMessage="No coaches found." highlightFn={highlightFn} />
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-5">
+        <Combobox value={filter}            onChange={setFilter}            options={modeOptions}        placeholder="All Games"   style={{ width: 160 }} />
+        <Combobox value={teamFilter}        onChange={setTeamFilter}        options={teamOptions}        placeholder="All Teams"   style={{ width: 160 }} />
+        <Combobox value={nationalityFilter} onChange={setNationalityFilter} options={nationalityOptions} placeholder="All Nations" style={{ width: 160 }} />
+        <AgeFilter ageMin={ageMin} ageMax={ageMax} onChange={(min, max) => { setAgeMin(min); setAgeMax(max) }} />
+        <div className="flex items-center gap-2 flex-1 min-w-48 px-3 py-2 rounded-lg bg-bg-primary border border-bg-border focus-within:border-accent-green/40 transition-colors duration-150">
+          <Search size={13} className="text-text-dim flex-shrink-0" />
+          <input value={nameSearch} onChange={e => setNameSearch(e.target.value)}
+            placeholder="Search coach..."
+            className="bg-transparent font-body text-sm text-text-primary placeholder:text-text-dim outline-none flex-1 min-w-0" />
+          {nameSearch && (
+            <button onMouseDown={e => { e.preventDefault(); setNameSearch('') }} className="text-text-dim hover:text-text-muted transition-colors cursor-pointer">
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Coach' : 'New Coach'}>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+      <DataTable columns={columns} data={filtered} loading={loading} emptyMessage="No coaches found." highlightFn={highlightFn} sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+
+      <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Coach' : 'New Coach'} width="max-w-xl">
+        <div className="space-y-3">
+          {/* Identity */}
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Name">
               <input className="input-field" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Alex Johnson" />
             </Field>
             <Field label="Email">
               <input type="email" className="input-field" value={form.email} onChange={e => set('email', e.target.value)} placeholder="coach@esports.com" />
             </Field>
+          </div>
+
+          {/* Profile */}
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Nationality">
+              <input className="input-field" value={form.nationality} onChange={e => set('nationality', e.target.value)} placeholder="Portugal" />
+            </Field>
+            <Field label="City">
+              <input className="input-field" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Lisbon" />
+            </Field>
+            <Field label="Date of Birth">
+              <input type="date" className="input-field" value={form.birthDate} onChange={e => set('birthDate', e.target.value)} />
+            </Field>
+          </div>
+
+          {/* Team + Mode */}
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Team">
               <select className="input-field" value={form.teamId} onChange={e => set('teamId', e.target.value)}>
                 <option value="">No team</option>
-                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                {teams.map(t => <option key={t.id} value={t.id}>{teamEmoji(t.name)} {t.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Mode">
+              <select className="input-field" value={form.specialization} onChange={e => set('specialization', e.target.value)}>
+                <option value="">None</option>
+                <option value="FPS">FPS</option>
+                <option value="MOBA">MOBA</option>
+                <option value="EFOOTBALL">eFootball</option>
+                <option value="RACING">Racing</option>
+                <option value="BATTLE_ROYALE">Battle Royale</option>
               </select>
             </Field>
           </div>
-          <div className="flex gap-3 justify-end pt-2">
+
+          <Field label="Achievements (one per line)">
+            <textarea className="input-field resize-none" rows={3}
+              placeholder={"FPS Coach of the Year 2025\nLed Team to 2nd place — Valorant Cup"}
+              value={form.achievementsText}
+              onChange={e => set('achievementsText', e.target.value)} />
+          </Field>
+
+          <div className="flex gap-3 justify-end pt-1">
             <button onClick={() => setModal(false)} className="btn-ghost">Cancel</button>
             <button onClick={handleSave} disabled={saving} className="btn-primary">
               {saving ? 'Saving...' : editing ? 'Save' : 'Create'}

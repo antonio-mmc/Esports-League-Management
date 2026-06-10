@@ -108,6 +108,12 @@ public class PlayerService {
         return playerRepository.save(player);
     }
 
+    public Player removeTeam(Long playerId) {
+        Player player = findById(playerId);
+        player.setTeam(null);
+        return playerRepository.save(player);
+    }
+
     public void delete(Long id) {
         playerRepository.deleteById(id);
     }

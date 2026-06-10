@@ -11,6 +11,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "players")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @DiscriminatorColumn(name = "player_type", discriminatorType = DiscriminatorType.STRING)
 @DiscriminatorValue("GENERIC")

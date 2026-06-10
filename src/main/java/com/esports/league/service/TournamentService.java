@@ -44,24 +44,22 @@ public class TournamentService {
 
         return tournament.getParticipatingTeams().stream()
             .map(team -> {
-                int w = 0, d = 0, l = 0;
+                int w = 0, l = 0;
                 for (Match m : played) {
                     boolean isA = m.getTeamA().getId().equals(team.getId());
                     boolean isB = m.getTeamB().getId().equals(team.getId());
                     if (!isA && !isB) continue;
                     int myScore  = isA ? m.getTeamAScore() : m.getTeamBScore();
                     int oppScore = isA ? m.getTeamBScore() : m.getTeamAScore();
-                    if      (myScore > oppScore) w++;
-                    else if (myScore < oppScore) l++;
-                    else                         d++;
+                    if (myScore > oppScore) w++;
+                    else                   l++;
                 }
-                int pts = w * 3 + d;
-                int played2 = w + d + l;
+                int pts = w * 3;
+                int played2 = w + l;
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("team",   team);
                 row.put("played", played2);
                 row.put("wins",   w);
-                row.put("draws",  d);
                 row.put("losses", l);
                 row.put("points", pts);
                 return row;
@@ -81,6 +79,8 @@ public class TournamentService {
         tournament.setName(updated.getName());
         tournament.setGame(updated.getGame());
         tournament.setStatus(updated.getStatus());
+        if (updated.getFormat() != null)       tournament.setFormat(updated.getFormat());
+        if (updated.getSpecificGame() != null) tournament.setSpecificGame(updated.getSpecificGame());
         return tournamentRepository.save(tournament);
     }
 

@@ -56,10 +56,14 @@ public class TeamService {
     public Team update(Long id, Team updated) {
         Team team = findById(id);
         team.setName(updated.getName());
+        team.setNationality(updated.getNationality());
+        team.setGame(updated.getGame());
         team.setWins(updated.getWins());
-        team.setDraws(updated.getDraws());
         team.setLosses(updated.getLosses());
         team.setPoints(updated.getPoints());
+        team.setTrophies(updated.getTrophies());
+        team.setFoundedYear(updated.getFoundedYear());
+        team.setCity(updated.getCity());
         return teamRepository.save(team);
     }
 

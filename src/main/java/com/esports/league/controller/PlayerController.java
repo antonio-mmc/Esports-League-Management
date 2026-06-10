@@ -45,6 +45,11 @@ public class PlayerController {
         return ResponseEntity.ok(playerService.assignTeam(id, teamId));
     }
 
+    @DeleteMapping("/{id}/team")
+    public ResponseEntity<Player> removeTeam(@PathVariable Long id) {
+        return ResponseEntity.ok(playerService.removeTeam(id));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         playerService.delete(id);

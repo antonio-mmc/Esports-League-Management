@@ -14,19 +14,23 @@ export const dashboardApi = {
 }
 
 export const playerApi = {
-  getAll:  ()      => api.get('/players'),
-  getById: (id)    => api.get(`/players/${id}`),
-  create:  (data)  => api.post('/players', data),
-  update:  (id, d) => api.put(`/players/${id}`, d),
-  delete:  (id)    => api.delete(`/players/${id}`),
+  getAll:      ()            => api.get('/players'),
+  getById:     (id)          => api.get(`/players/${id}`),
+  create:      (data)        => api.post('/players', data),
+  update:      (id, d)       => api.put(`/players/${id}`, d),
+  assignTeam:  (id, teamId)  => api.put(`/players/${id}/team/${teamId}`),
+  removeTeam:  (id)          => api.delete(`/players/${id}/team`),
+  delete:      (id)          => api.delete(`/players/${id}`),
 }
 
 export const coachApi = {
-  getAll:  ()      => api.get('/coaches'),
-  getById: (id)    => api.get(`/coaches/${id}`),
-  create:  (data)  => api.post('/coaches', data),
-  update:  (id, d) => api.put(`/coaches/${id}`, d),
-  delete:  (id)    => api.delete(`/coaches/${id}`),
+  getAll:      ()            => api.get('/coaches'),
+  getById:     (id)          => api.get(`/coaches/${id}`),
+  create:      (data)        => api.post('/coaches', data),
+  update:      (id, d)       => api.put(`/coaches/${id}`, d),
+  assignTeam:  (id, teamId)  => api.put(`/coaches/${id}/team/${teamId}`),
+  removeTeam:  (id)          => api.delete(`/coaches/${id}/team`),
+  delete:      (id)          => api.delete(`/coaches/${id}`),
 }
 
 export const teamApi = {
@@ -38,11 +42,12 @@ export const teamApi = {
 }
 
 export const tournamentApi = {
-  getAll:  ()      => api.get('/tournaments'),
-  getById: (id)    => api.get(`/tournaments/${id}`),
-  create:  (data)  => api.post('/tournaments', data),
-  update:  (id, d) => api.put(`/tournaments/${id}`, d),
-  delete:  (id)    => api.delete(`/tournaments/${id}`),
+  getAll:       ()      => api.get('/tournaments'),
+  getById:      (id)    => api.get(`/tournaments/${id}`),
+  getStandings: (id)    => api.get(`/tournaments/${id}/standings`),
+  create:       (data)  => api.post('/tournaments', data),
+  update:       (id, d) => api.put(`/tournaments/${id}`, d),
+  delete:       (id)    => api.delete(`/tournaments/${id}`),
 }
 
 export const matchApi = {
