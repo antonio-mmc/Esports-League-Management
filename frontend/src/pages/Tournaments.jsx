@@ -9,6 +9,7 @@ import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
 import { useGameFilter } from '../context/GameFilterContext'
 import { tournamentApi, teamApi, playerApi, coachApi } from '../services/api'
+import { matchesGameFilter } from '../utils/gameMeta'
 
 function Field({ label, children }) {
   return (
@@ -48,14 +49,6 @@ function getStyle(game) {
   if (g.includes('RACING')) return GAME_STYLES.RACING
   if (g.includes('BATTLE_ROYALE') || g.includes('BATTLE ROYALE') || g.includes('ROYALE')) return GAME_STYLES.BATTLE_ROYALE
   return GAME_STYLES.DEFAULT
-}
-
-function matchesGameFilter(game, filterKey) {
-  if (filterKey === 'ALL') return true
-  const g = (game || '').toUpperCase()
-  if (filterKey === 'EFOOTBALL') return g.includes('EFOOTBALL') || g.includes('FOOTBALL') || g.includes('FIFA')
-  if (filterKey === 'BATTLE_ROYALE') return g.includes('BATTLE_ROYALE') || g.includes('BATTLE ROYALE') || g.includes('ROYALE')
-  return g.includes(filterKey)
 }
 
 function formatLabel(format) {

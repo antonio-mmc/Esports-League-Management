@@ -66,18 +66,50 @@ public class Match {
     public Tournament getTournament() { return tournament; }
     public void setTournament(Tournament tournament) { this.tournament = tournament; }
 
+    /** Records a result for the first time, applying its effect to both teams' records. */
     public void recordResult(int scoreA, int scoreB) {
         if (resultRecorded) throw new IllegalStateException("Result already recorded.");
         this.teamAScore = scoreA;
         this.teamBScore = scoreB;
         this.resultRecorded = true;
+        applyOutcome();
+    }
 
-        if (scoreA > scoreB) {
+    /**
+     * Edits an existing result: reverts the previous outcome from both teams' records,
+     * then applies the new one so points/wins/losses stay consistent.
+     */
+    public void updateResult(int scoreA, int scoreB) {
+        if (resultRecorded) revertOutcome();
+        this.teamAScore = scoreA;
+        this.teamBScore = scoreB;
+        this.resultRecorded = true;
+        applyOutcome();
+    }
+
+    /** Reverts this match's effect on both teams' records (used before deleting a played match). */
+    public void revertResultEffect() {
+        if (resultRecorded) revertOutcome();
+    }
+
+    private void applyOutcome() {
+        if (teamAScore > teamBScore) {
             teamA.registerWin();
             teamB.registerLoss();
-        } else {
+        } else if (teamBScore > teamAScore) {
             teamB.registerWin();
             teamA.registerLoss();
+        }
+        // Equal scores → draw: no win/loss is registered for either team.
+    }
+
+    private void revertOutcome() {
+        if (teamAScore > teamBScore) {
+            teamA.unregisterWin();
+            teamB.unregisterLoss();
+        } else if (teamBScore > teamAScore) {
+            teamB.unregisterWin();
+            teamA.unregisterLoss();
         }
     }
 }

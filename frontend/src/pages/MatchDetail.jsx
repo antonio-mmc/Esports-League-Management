@@ -8,6 +8,7 @@ import {
 import Badge from '../components/Badge'
 import { matchApi, teamApi } from '../services/api'
 import { teamEmoji } from '../utils/teamEmoji'
+import { winRate } from '../utils/stats'
 
 // ── Modality meta ────────────────────────────────────────────────────────────
 const TYPE_META = {
@@ -459,8 +460,7 @@ export default function MatchDetail() {
           <SectionTitle icon={Trophy} color="#22C55E">Season Record</SectionTitle>
           <div className="space-y-3">
             {[{ t: match.teamA, r: recA, a: ACCENT_A }, { t: match.teamB, r: recB, a: ACCENT_B }].map(({ t, r, a }) => {
-              const total = r.w + r.l
-              const wr = total > 0 ? Math.round(r.w / total * 100) : 0
+              const wr = winRate(r.w, r.l)
               return (
                 <div key={t?.id}>
                   <div className="flex items-center justify-between mb-1">

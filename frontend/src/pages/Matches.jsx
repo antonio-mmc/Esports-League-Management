@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
-import { Plus, Trash2, Swords, CheckCircle, Search, X, Trophy, Shield, Users, UserCheck, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, Swords, CheckCircle, Edit2, Search, X, Trophy, Shield, Users, UserCheck, ChevronRight } from 'lucide-react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useToast } from '../components/Toast'
@@ -10,6 +10,7 @@ import Badge from '../components/Badge'
 import Combobox from '../components/Combobox'
 import { useGameFilter } from '../context/GameFilterContext'
 import { matchApi, teamApi, tournamentApi, playerApi, coachApi } from '../services/api'
+import { matchesGameFilter } from '../utils/gameMeta'
 
 function Field({ label, children }) {
   return (
@@ -30,14 +31,6 @@ const MODE_OPTIONS = [
   { value: 'RACING',        label: 'Racing' },
   { value: 'BATTLE_ROYALE', label: 'Battle Royale' },
 ]
-
-function matchesGameFilter(game, filterKey) {
-  if (filterKey === 'ALL') return true
-  const g = (game || '').toUpperCase()
-  if (filterKey === 'EFOOTBALL') return g.includes('EFOOTBALL') || g.includes('FOOTBALL') || g.includes('FIFA')
-  if (filterKey === 'BATTLE_ROYALE') return g.includes('BATTLE_ROYALE') || g.includes('BATTLE ROYALE') || g.includes('ROYALE')
-  return g.includes(filterKey)
-}
 
 const matchGame = (m) => m.teamA?.game || m.teamB?.game || m.tournament?.game || ''
 
@@ -242,9 +235,10 @@ export default function Matches() {
   const handleResult = async () => {
     setSaving(true)
     try {
+      const wasRecorded = selectedMatch.resultRecorded
       await matchApi.recordResult(selectedMatch.id, Number(result.scoreA), Number(result.scoreB))
       setResultModal(false)
-      toast('Result recorded.', 'success')
+      toast(wasRecorded ? 'Result updated.' : 'Result recorded.', 'success')
       load()
     } catch (e) { toast(e?.response?.data?.message || 'Failed to record result.', 'error') }
     finally { setSaving(false) }
@@ -297,13 +291,11 @@ export default function Matches() {
           title="View details">
           <ChevronRight size={13} />
         </Link>
-        {!r.resultRecorded && (
-          <button onClick={() => openResult(r)}
-            title="Record result"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-accent-green hover:bg-accent-green/10 transition-all duration-150 cursor-pointer">
-            <CheckCircle size={13} />
-          </button>
-        )}
+        <button onClick={() => openResult(r)}
+          title={r.resultRecorded ? 'Edit result' : 'Record result'}
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-accent-green hover:bg-accent-green/10 transition-all duration-150 cursor-pointer">
+          {r.resultRecorded ? <Edit2 size={13} /> : <CheckCircle size={13} />}
+        </button>
         <button onClick={() => handleDelete(r.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-all duration-150 cursor-pointer">
           <Trash2 size={13} />
         </button>
@@ -489,7 +481,7 @@ export default function Matches() {
       </Modal>
 
       {/* Record result modal */}
-      <Modal open={resultModal} onClose={() => setResultModal(false)} title="Record Result" width="max-w-sm">
+      <Modal open={resultModal} onClose={() => setResultModal(false)} title={selectedMatch?.resultRecorded ? 'Edit Result' : 'Record Result'} width="max-w-sm">
         <div className="space-y-4">
           <div className="text-center py-2">
             <p className="font-body text-sm text-text-muted mb-1">

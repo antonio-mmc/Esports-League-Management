@@ -50,6 +50,7 @@ public class TeamService {
         if (teamRepository.existsByName(team.getName())) {
             throw new IllegalArgumentException("Team name already exists.");
         }
+        team.syncPoints(); // points are derived from wins, never sent by the client
         return teamRepository.save(team);
     }
 
@@ -60,10 +61,10 @@ public class TeamService {
         team.setGame(updated.getGame());
         team.setWins(updated.getWins());
         team.setLosses(updated.getLosses());
-        team.setPoints(updated.getPoints());
         team.setTrophies(updated.getTrophies());
         team.setFoundedYear(updated.getFoundedYear());
         team.setCity(updated.getCity());
+        team.syncPoints(); // keep points = wins * 3 instead of trusting the (absent) payload value
         return teamRepository.save(team);
     }
 

@@ -9,20 +9,10 @@ import Combobox from '../components/Combobox'
 import { GAME_FILTERS, useGameFilter } from '../context/GameFilterContext'
 import { dashboardApi, tournamentApi, matchApi, teamApi, coachApi } from '../services/api'
 import { teamEmoji } from '../utils/teamEmoji'
+import { TYPE_COLOR, TYPE_LABEL, TYPE_BADGE, TYPE_EMOJI, matchesGameFilter as matchesGame } from '../utils/gameMeta'
+import { winRate } from '../utils/stats'
 
-const TYPE_COLOR = { FPS: '#06B6D4', MOBA: '#8B5CF6', EFOOTBALL: '#22C55E', RACING: '#F59E0B', BATTLE_ROYALE: '#EF4444', GENERIC: '#94A3B8' }
-const TYPE_LABEL = { FPS: 'FPS', MOBA: 'MOBA', EFOOTBALL: 'eFootball', RACING: 'Racing', BATTLE_ROYALE: 'Battle Royale', GENERIC: 'Generic' }
-const TYPE_BADGE = { FPS: 'cyan', MOBA: 'purple', EFOOTBALL: 'green', RACING: 'orange', BATTLE_ROYALE: 'red', GENERIC: 'gray' }
-const TYPE_EMOJI = { FPS: '🎯', MOBA: '⚔️', EFOOTBALL: '⚽', RACING: '🏎️', BATTLE_ROYALE: '💥', GENERIC: '🎮' }
 const STATUS_COLOR = { ACTIVE: 'green', FINISHED: 'gray', PENDING: 'cyan', UPCOMING: 'cyan' }
-
-function matchesGame(tournamentGame, filterKey) {
-  if (filterKey === 'ALL') return true
-  const g = (tournamentGame || '').toUpperCase()
-  if (filterKey === 'EFOOTBALL') return g.includes('EFOOTBALL') || g.includes('FOOTBALL') || g.includes('FIFA')
-  if (filterKey === 'BATTLE_ROYALE') return g.includes('BATTLE_ROYALE') || g.includes('BATTLE ROYALE') || g.includes('ROYALE')
-  return g.includes(filterKey)
-}
 
 const fadeUp = {
   initial: { opacity: 0, y: 8 },
@@ -334,8 +324,7 @@ export default function Dashboard() {
                   ) : (
                     <div className="space-y-1">
                       {allViewTopTeams.map((t, i) => {
-                        const total    = (t.wins || 0) + (t.losses || 0)
-                        const wr       = total > 0 ? Math.round((t.wins / total) * 100) : 0
+                        const wr       = winRate(t.wins, t.losses)
                         const dom      = getDominantType(t)
                         const modeCol  = TYPE_COLOR[dom] || '#94A3B8'
                         const modeLbl  = TYPE_LABEL[dom] || dom || '—'
@@ -372,8 +361,8 @@ export default function Dashboard() {
                     <div className="space-y-1">
                       {allViewTopCoaches.map((c, i) => {
                         const team  = c._team
-                        const total = (team?.wins || 0) + (team?.losses || 0)
-                        const wr    = total > 0 ? Math.round((team.wins / total) * 100) : null
+                        const hasGames = (team?.wins || 0) + (team?.losses || 0) > 0
+                        const wr    = hasGames ? winRate(team.wins, team.losses) : null
                         const dom   = getDominantType(team)
                         return (
                           <div key={c.id} className="flex items-center gap-3 py-1 px-3 rounded-lg hover:bg-bg-primary transition-colors duration-150">

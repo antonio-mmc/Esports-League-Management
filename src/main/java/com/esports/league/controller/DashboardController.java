@@ -1,7 +1,6 @@
 package com.esports.league.controller;
 
 import com.esports.league.model.Player;
-import com.esports.league.model.Team;
 import com.esports.league.repository.*;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,27 +36,6 @@ public class DashboardController {
             "matches",          matchRepository.count(),
             "completedMatches", (long) matchRepository.findByResultRecorded(true).size()
         );
-    }
-
-    @GetMapping("/leaderboard")
-    public List<Map<String, Object>> getLeaderboard() {
-        return teamRepository.findAll().stream()
-            .sorted(Comparator.comparingInt(Team::getPoints).reversed()
-                .thenComparingInt(Team::getWins).reversed())
-            .limit(10)
-            .map(t -> {
-                int total = t.getWins() + t.getLosses();
-                int wr = total > 0 ? Math.round((float) t.getWins() / total * 100) : 0;
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("id",       t.getId());
-                row.put("name",     t.getName());
-                row.put("wins",     t.getWins());
-                row.put("losses",   t.getLosses());
-                row.put("points",   t.getPoints());
-                row.put("winRate",  wr);
-                return row;
-            })
-            .toList();
     }
 
     @GetMapping("/top-players")

@@ -10,10 +10,9 @@ import Modal from '../components/Modal'
 import { useToast } from '../components/Toast'
 import { coachApi, teamApi, tournamentApi } from '../services/api'
 import { teamEmoji } from '../utils/teamEmoji'
+import { TYPE_COLOR, TYPE_BADGE, TYPE_LABEL } from '../utils/gameMeta'
+import { winRate as computeWinRate } from '../utils/stats'
 
-const TYPE_COLOR = { FPS: '#06B6D4', MOBA: '#8B5CF6', EFOOTBALL: '#22C55E', RACING: '#F59E0B', BATTLE_ROYALE: '#EF4444' }
-const TYPE_BADGE = { FPS: 'cyan',    MOBA: 'purple',  EFOOTBALL: 'green',   RACING: 'orange', BATTLE_ROYALE: 'red' }
-const TYPE_LABEL = { FPS: 'FPS',     MOBA: 'MOBA',    EFOOTBALL: 'eFootball', RACING: 'Racing', BATTLE_ROYALE: 'Battle Royale' }
 const TYPE_ICON  = { FPS: Crosshair, MOBA: Sword,     EFOOTBALL: Footprints,  RACING: Car,      BATTLE_ROYALE: Skull }
 
 const STATUS_COLOR = { ACTIVE: 'green', UPCOMING: 'cyan', COMPLETED: 'gray', FINISHED: 'gray', PENDING: 'cyan' }
@@ -238,7 +237,7 @@ export default function CoachDetail() {
   const losses = team?.losses || 0
   const points = team?.points || 0
   const total  = wins + losses
-  const winRate = total > 0 ? Math.round((wins / total) * 100) : 0
+  const winRate = computeWinRate(wins, losses)
   const barColor = winRate >= 75 ? '#3B82F6'
     : winRate >= 65 ? '#22C55E'
     : winRate >= 55 ? '#84CC16'

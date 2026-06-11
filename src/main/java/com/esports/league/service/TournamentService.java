@@ -51,8 +51,9 @@ public class TournamentService {
                     if (!isA && !isB) continue;
                     int myScore  = isA ? m.getTeamAScore() : m.getTeamBScore();
                     int oppScore = isA ? m.getTeamBScore() : m.getTeamAScore();
-                    if (myScore > oppScore) w++;
-                    else                   l++;
+                    if (myScore > oppScore)      w++;
+                    else if (oppScore > myScore) l++;
+                    // equal → draw: counted as neither win nor loss
                 }
                 int pts = w * 3;
                 int played2 = w + l;

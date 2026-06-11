@@ -8,7 +8,6 @@ const api = axios.create({
 
 export const dashboardApi = {
   getStats:        () => api.get('/dashboard/stats'),
-  getLeaderboard:  () => api.get('/dashboard/leaderboard'),
   getTopPlayers:   () => api.get('/dashboard/top-players'),
   getGameBreakdown:() => api.get('/dashboard/game-breakdown'),
 }

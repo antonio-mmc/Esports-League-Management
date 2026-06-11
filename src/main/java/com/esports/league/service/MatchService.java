@@ -48,13 +48,26 @@ public class MatchService {
 
     public Match recordResult(Long matchId, int scoreA, int scoreB) {
         Match match = findById(matchId);
-        match.recordResult(scoreA, scoreB);
+        // Recording for the first time applies points; editing an existing result
+        // reverts the old outcome and applies the new one so totals stay consistent.
+        if (match.isResultRecorded()) {
+            match.updateResult(scoreA, scoreB);
+        } else {
+            match.recordResult(scoreA, scoreB);
+        }
         teamRepository.save(match.getTeamA());
         teamRepository.save(match.getTeamB());
         return matchRepository.save(match);
     }
 
     public void delete(Long id) {
-        matchRepository.deleteById(id);
+        Match match = findById(id);
+        // Deleting a played match must undo the points/wins/losses it awarded.
+        if (match.isResultRecorded()) {
+            match.revertResultEffect();
+            teamRepository.save(match.getTeamA());
+            teamRepository.save(match.getTeamB());
+        }
+        matchRepository.delete(match);
     }
 }

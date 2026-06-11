@@ -103,6 +103,22 @@ public class Team {
         losses++;
     }
 
+    /** Reverts a previously registered win (e.g. when a match result is edited or deleted). */
+    public void unregisterWin() {
+        if (wins > 0) wins--;
+        recalcPoints();
+    }
+
+    /** Reverts a previously registered loss. */
+    public void unregisterLoss() {
+        if (losses > 0) losses--;
+    }
+
+    /** Recomputes points from the current win count. Call after manually editing {@code wins}. */
+    public void syncPoints() {
+        recalcPoints();
+    }
+
     private void recalcPoints() {
         this.points = wins * 3;
     }

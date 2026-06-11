@@ -49,6 +49,14 @@ public class PlayerService {
         if (playerRepository.existsByNickname(player.getNickname())) {
             throw new IllegalArgumentException("Nickname already in use.");
         }
+        // Replace any client-supplied team stub ({id}) with a managed entity.
+        if (player.getTeam() != null && player.getTeam().getId() != null) {
+            Team team = teamRepository.findById(player.getTeam().getId())
+                .orElseThrow(() -> new RuntimeException("Team not found: " + player.getTeam().getId()));
+            player.setTeam(team);
+        } else {
+            player.setTeam(null);
+        }
         return playerRepository.save(player);
     }
 
@@ -66,6 +74,15 @@ public class PlayerService {
         player.setAchievements(updated.getAchievements());
         if (updated.getPassword() != null && !updated.getPassword().isBlank()) {
             player.setPassword(updated.getPassword());
+        }
+
+        // Team assignment from the edit form (an empty selection clears it).
+        if (updated.getTeam() != null && updated.getTeam().getId() != null) {
+            Team team = teamRepository.findById(updated.getTeam().getId())
+                .orElseThrow(() -> new RuntimeException("Team not found: " + updated.getTeam().getId()));
+            player.setTeam(team);
+        } else {
+            player.setTeam(null);
         }
 
         if (player instanceof FPSPlayer fps && updated instanceof FPSPlayer upd) {

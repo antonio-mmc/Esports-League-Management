@@ -33,7 +33,15 @@ public class CoachService {
         if (coachRepository.existsByEmail(coach.getEmail())) {
             throw new IllegalArgumentException("Email already in use.");
         }
-        return coachRepository.save(coach);
+        // Save the coach first, then link the team through assignTeam so the existing
+        // coach (if any) is displaced and both sides of the relationship stay consistent.
+        Long teamId = coach.getTeam() != null ? coach.getTeam().getId() : null;
+        coach.setTeam(null);
+        Coach saved = coachRepository.save(coach);
+        if (teamId != null) {
+            return assignTeam(saved.getId(), teamId);
+        }
+        return saved;
     }
 
     public Coach update(Long id, Coach updated) {

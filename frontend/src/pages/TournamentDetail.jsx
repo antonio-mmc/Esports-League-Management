@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Trophy, Shield, Swords, GitBranch, Users, Calendar } from 'lucide-react'
 import Badge from '../components/Badge'
 import { tournamentApi } from '../services/api'
+import { winRate } from '../utils/stats'
 
 const STATUS_COLOR = { ACTIVE: 'green', FINISHED: 'gray', COMPLETED: 'gray', PENDING: 'cyan', UPCOMING: 'cyan' }
 
@@ -187,7 +188,8 @@ function GroupStageView({ matches, teams, accent = '#8B5CF6' }) {
       if (!a || !b) return
       a.played++; b.played++
       if (m.teamAScore > m.teamBScore) { a.wins++; a.pts += 3; b.losses++ }
-      else { b.wins++; b.pts += 3; a.losses++ }
+      else if (m.teamBScore > m.teamAScore) { b.wins++; b.pts += 3; a.losses++ }
+      // equal → draw: counted as played only
     })
     return Object.values(stats).sort((a, b) => b.pts - a.pts || b.wins - a.wins)
   }, [teams, groupMatches])
@@ -287,7 +289,7 @@ function LeagueStandings({ teams, matches, accent = '#06B6D4' }) {
         if (!isA && !isB) return
         const myScore  = isA ? m.teamAScore : m.teamBScore
         const oppScore = isA ? m.teamBScore : m.teamAScore
-        if (myScore > oppScore) w++; else l++
+        if (myScore > oppScore) w++; else if (oppScore > myScore) l++
       })
       return { team: t, played: w + l, wins: w, losses: l, pts: w * 3 }
     }).sort((a, b) => b.pts - a.pts || b.wins - a.wins)
@@ -296,8 +298,7 @@ function LeagueStandings({ teams, matches, accent = '#06B6D4' }) {
   return (
     <div className="space-y-1.5">
       {standings.map((s, i) => {
-        const total = s.wins + s.losses
-        const wr = total > 0 ? Math.round(s.wins / total * 100) : 0
+        const wr = winRate(s.wins, s.losses)
         return (
           <Link key={s.team.id} to={`/teams/${s.team.id}`}
             className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-bg-primary border border-transparent hover:border-bg-border transition-all duration-150 group cursor-pointer">

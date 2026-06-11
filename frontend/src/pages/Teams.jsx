@@ -9,6 +9,7 @@ import Combobox from '../components/Combobox'
 import { useToast } from '../components/Toast'
 import { teamApi } from '../services/api'
 import { teamEmoji } from '../utils/teamEmoji'
+import { winRate } from '../utils/stats'
 
 const TYPE_META = {
   FPS:           { label: 'FPS',          color: 'cyan'   },
@@ -197,8 +198,7 @@ export default function Teams() {
     { key: 'wins',   label: 'W', sortable: true, render: v => <span className="text-accent-green font-semibold">{v ?? 0}</span> },
     { key: 'losses', label: 'L', sortable: true, render: v => <span className="text-red-400 font-semibold">{v ?? 0}</span>      },
     { key: '_wr', label: 'WR', sortable: true, render: (_, r) => {
-      const total = (r.wins ?? 0) + (r.losses ?? 0)
-      const wr = total > 0 ? Math.round((r.wins / total) * 100) : 0
+      const wr = winRate(r.wins, r.losses)
       const color = wr >= 75 ? '#3B82F6' : wr >= 65 ? '#22C55E' : wr >= 55 ? '#84CC16'
                   : wr >= 45 ? '#EAB308' : wr >= 35 ? '#F97316' : wr >= 20 ? '#F87171' : '#DC2626'
       return (
