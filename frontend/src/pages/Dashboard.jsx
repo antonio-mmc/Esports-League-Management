@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import StatCard from '../components/StatCard'
 import PageHeader from '../components/PageHeader'
 import Badge from '../components/Badge'
+import Combobox from '../components/Combobox'
 import { GAME_FILTERS, useGameFilter } from '../context/GameFilterContext'
 import { dashboardApi, tournamentApi, matchApi, teamApi, coachApi } from '../services/api'
 import { teamEmoji } from '../utils/teamEmoji'
@@ -39,6 +40,7 @@ export default function Dashboard() {
   const [teams,       setTeams]       = useState([])
   const [coaches,     setCoaches]     = useState([])
   const [loading,     setLoading]     = useState(true)
+  const [gameDetail,  setGameDetail]  = useState('ALL')
 
   useEffect(() => {
     const load = async () => {
@@ -63,9 +65,52 @@ export default function Dashboard() {
     load()
   }, [])
 
+  // Specific-game (e.g. Valorant, LoL) selector — scoped to the current modality
+  useEffect(() => { setGameDetail('ALL') }, [gameFilter])
+
+  const availableGames = useMemo(() => {
+    const set = new Set(
+      tournaments
+        .filter(t => matchesGame(t.game, gameFilter))
+        .map(t => t.specificGame)
+        .filter(Boolean)
+    )
+    return [...set].sort()
+  }, [tournaments, gameFilter])
+
+  const gameDetailOptions = useMemo(() => [
+    { value: 'ALL', label: 'All Games' },
+    ...availableGames.map(g => ({ value: g, label: g })),
+  ], [availableGames])
+
+  // teamId -> Set of specific games it competes in (derived from its tournaments)
+  const teamGames = useMemo(() => {
+    const map = {}
+    tournaments.forEach(t => {
+      if (!t.specificGame) return
+      ;(t.participatingTeams || []).forEach(team => {
+        if (team?.id == null) return
+        ;(map[team.id] ||= new Set()).add(t.specificGame)
+      })
+    })
+    return map
+  }, [tournaments])
+
+  const teamIdByName = useMemo(() =>
+    Object.fromEntries(teams.map(t => [t.name, t.id])),
+  [teams])
+
+  const teamMatchesGame   = (teamId) => gameDetail === 'ALL' || !!teamGames[teamId]?.has(gameDetail)
+  const playerMatchesGame = (p) => {
+    if (gameDetail === 'ALL') return true
+    const id = teamIdByName[p.teamName]
+    return id != null && teamMatchesGame(id)
+  }
+
   const filteredTopPlayers = useMemo(() =>
-    gameFilter === 'ALL' ? topPlayers : topPlayers.filter(p => p.playerType === gameFilter),
-  [topPlayers, gameFilter])
+    (gameFilter === 'ALL' ? topPlayers : topPlayers.filter(p => p.playerType === gameFilter))
+      .filter(playerMatchesGame),
+  [topPlayers, gameFilter, gameDetail, teamIdByName, teamGames])
 
   const MODE_ORDER = ['FPS', 'MOBA', 'EFOOTBALL', 'RACING', 'BATTLE_ROYALE']
 
@@ -80,23 +125,23 @@ export default function Dashboard() {
   // ALL view: 1 best per discipline in fixed MODE_ORDER (all three widgets stay aligned)
   const allViewTopPlayers = useMemo(() =>
     MODE_ORDER
-      .map(type => topPlayers.find(p => p.playerType === type))
+      .map(type => topPlayers.find(p => p.playerType === type && playerMatchesGame(p)))
       .filter(Boolean),
-  [topPlayers])
+  [topPlayers, gameDetail, teamIdByName, teamGames])
 
   const allViewTopTeams = useMemo(() =>
     MODE_ORDER.map(type => {
-      const ofType = teams.filter(t => getDominantType(t) === type)
+      const ofType = teams.filter(t => getDominantType(t) === type && teamMatchesGame(t.id))
       return [...ofType].sort((a, b) => (b.points || 0) - (a.points || 0))[0]
     }).filter(Boolean),
-  [teams])
+  [teams, gameDetail, teamGames])
 
   const allViewTopCoaches = useMemo(() => {
     const teamById = Object.fromEntries(teams.map(t => [t.id, t]))
     return MODE_ORDER.map(type => {
       const ofType = coaches.filter(c => {
         const team = teamById[c.team?.id]
-        return team && getDominantType(team) === type
+        return team && getDominantType(team) === type && teamMatchesGame(team.id)
       })
       const best = [...ofType].sort((a, b) => {
         const ta = teamById[a.team?.id]
@@ -106,22 +151,25 @@ export default function Dashboard() {
       if (!best) return null
       return { ...best, _team: teamById[best.team?.id] }
     }).filter(Boolean)
-  }, [coaches, teams])
+  }, [coaches, teams, gameDetail, teamGames])
 
   const filteredTournaments = useMemo(() =>
     tournaments
       .filter(t => matchesGame(t.game, gameFilter))
+      .filter(t => gameDetail === 'ALL' || t.specificGame === gameDetail)
       .sort((a, b) => {
         const order = { ACTIVE: 0, UPCOMING: 1, PENDING: 1, COMPLETED: 2, FINISHED: 2 }
         const sd = (order[a.status] ?? 3) - (order[b.status] ?? 3)
         if (sd !== 0) return sd
         return new Date(b.startDate || 0) - new Date(a.startDate || 0)
       }),
-  [tournaments, gameFilter])
+  [tournaments, gameFilter, gameDetail])
 
   const filteredMatches = useMemo(() =>
-    matches.filter(m => matchesGame(m.tournament?.game, gameFilter)),
-  [matches, gameFilter])
+    matches
+      .filter(m => matchesGame(m.tournament?.game, gameFilter))
+      .filter(m => gameDetail === 'ALL' || m.tournament?.specificGame === gameDetail),
+  [matches, gameFilter, gameDetail])
 
   const recentResults = useMemo(() =>
     filteredMatches
@@ -219,6 +267,15 @@ export default function Dashboard() {
             {TYPE_EMOJI[gameFilter]} {TYPE_LABEL[gameFilter]}
           </span>
         )}
+        action={availableGames.length > 0 && (
+          <Combobox
+            value={gameDetail}
+            onChange={setGameDetail}
+            options={gameDetailOptions}
+            placeholder="All Games"
+            style={{ width: 190 }}
+          />
+        )}
       />
 
       {/* Stat cards */}
@@ -294,7 +351,6 @@ export default function Dashboard() {
                               <p className="font-body text-xs text-text-dim truncate">{modeLbl}</p>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
-                              <Badge variant="green">{t.points ?? 0}</Badge>
                               <span className="font-body text-xs text-text-dim w-8 text-right">{wr}%</span>
                             </div>
                           </Link>
@@ -384,7 +440,7 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2">
                       <Trophy size={15} className="text-accent-purple" />
                       <h3 className="font-display text-sm text-text-primary tracking-wide uppercase">Tournaments</h3>
-                      <span className="font-body text-xs text-text-dim">({tournaments.length})</span>
+                      <span className="font-body text-xs text-text-dim">({filteredTournaments.length})</span>
                     </div>
                     <Link to="/tournaments" className="font-body text-xs text-accent-green hover:underline cursor-pointer">View all</Link>
                   </div>

@@ -54,7 +54,17 @@ public class DataInitializer implements CommandLineRunner {
         Map.entry("Alessandro Romano",  List.of("SimRacing Coach of the Year 2024")),
         Map.entry("Hans Brauer",        List.of("Nitro Kings Champions — SimRacing Pro League 2025", "Best Tactical Setup Award 2025")),
         Map.entry("Rafael Souza",       List.of("Battle Royale Upset Award 2025")),
-        Map.entry("Ji-ho Cho",          List.of("Zone Control Series Champion 2024", "Tactical Excellence Award 2025"))
+        Map.entry("Ji-ho Cho",          List.of("Zone Control Series Champion 2024", "Tactical Excellence Award 2025")),
+        Map.entry("Pierre Lefèvre",     List.of("Runner-Up — CS2 Major 2025")),
+        Map.entry("Veikko Laine",       List.of("Champion — Dota 2 International 2025")),
+        Map.entry("Seung-min Oh",       List.of("Top 4 — Dota 2 International 2025")),
+        Map.entry("Roberto Alves",      List.of("Champion — EA FC Winter Cup 2025")),
+        Map.entry("Xavi Moreno",        List.of("eFootball Tactician Award 2025")),
+        Map.entry("Gary Sutton",        List.of("Best Newcomer Coach 2025")),
+        Map.entry("James Whitfield",    List.of("Runner-Up — Gran Turismo Champions 2025")),
+        Map.entry("Kenji Mori",         List.of("Champion — Gran Turismo Champions 2025")),
+        Map.entry("Chris Donovan",      List.of("Champion — Fortnite World Cup 2025")),
+        Map.entry("Marc Tremblay",      List.of("Runner-Up — Fortnite World Cup 2025"))
     );
 
     // eFootball nickname → [shotsOnTarget, ballRecoveries]
@@ -138,7 +148,12 @@ public class DataInitializer implements CommandLineRunner {
             boolean teamInfoMissing          = teamRepo.findAll().stream().anyMatch(t -> t.getFoundedYear() == null);
             boolean specificGameMissing      = tournamentRepo.findAll().stream().anyMatch(t -> t.getSpecificGame() == null);
             boolean eliminationMissing       = tournamentRepo.findAll().stream().noneMatch(t -> t.getFormat() != null && !"LEAGUE".equals(t.getFormat()));
-            if (!playersMissing && !tourneysMissing && !fpsMissing && !efbMissing && !racingMissing && !brMissing && !historyMissing && !moreUpcoming && !coachesMissing && !coachAchievementsMissing && !freeAgentsMissing && !teamDataMissing && !teamInfoMissing && !specificGameMissing && !eliminationMissing) return;
+            boolean endDatesMissing0         = tournamentRepo.findAll().stream().anyMatch(t -> t.getEndDate() == null && "COMPLETED".equals(t.getStatus()));
+            boolean groupStageMissing0       = tournamentRepo.findAll().stream().noneMatch(t -> "GROUP_STAGE".equals(t.getFormat()));
+            boolean completedElimMissing0    = tournamentRepo.findAll().stream().noneMatch(t -> "COMPLETED".equals(t.getStatus()) && !"LEAGUE".equals(t.getFormat()));
+            boolean prizesMissing0           = tournamentRepo.findAll().stream().noneMatch(t -> t.getPrizeFirst() != null);
+            boolean expansionMissing         = teamRepo.findAll().stream().noneMatch(t -> "Crimson Vipers".equals(t.getName()));
+            if (!playersMissing && !tourneysMissing && !fpsMissing && !efbMissing && !racingMissing && !brMissing && !historyMissing && !moreUpcoming && !coachesMissing && !coachAchievementsMissing && !freeAgentsMissing && !teamDataMissing && !teamInfoMissing && !specificGameMissing && !eliminationMissing && !endDatesMissing0 && !groupStageMissing0 && !completedElimMissing0 && !prizesMissing0 && !expansionMissing) return;
 
             if (playersMissing) {
                 playerRepo.findAll().forEach(p -> {
@@ -267,6 +282,32 @@ public class DataInitializer implements CommandLineRunner {
 
             if (eliminationMissing) seedElimination();
 
+            if (endDatesMissing0) {
+                Map<String, String> END_DATES = Map.ofEntries(
+                    Map.entry("Valorant Champions 2025",       "2025-01-25"),
+                    Map.entry("Valorant World Cup 2024",        "2024-05-12"),
+                    Map.entry("LoL Spring Championship 2025",   "2025-02-12"),
+                    Map.entry("LoL Pro League 2024",            "2024-03-31"),
+                    Map.entry("FIFA World Cup Sim 2025",        "2025-01-26"),
+                    Map.entry("FIFA eLeague 2024",              "2024-06-19"),
+                    Map.entry("SimRacing World Cup 2025",       "2025-04-05"),
+                    Map.entry("SimRacing Pro League 2024",      "2024-04-26"),
+                    Map.entry("BR World Series 2025",           "2025-06-05"),
+                    Map.entry("BR Nations Cup 2024",            "2024-06-05"),
+                    Map.entry("Valorant Autumn Knockout 2024",  "2024-10-15"),
+                    Map.entry("BR Double Trouble 2024",         "2024-09-20"),
+                    Map.entry("Valorant Open Cup 2025",         "2025-09-15")
+                );
+                tournamentRepo.findAll().forEach(t -> {
+                    if (t.getEndDate() != null || !"COMPLETED".equals(t.getStatus())) return;
+                    String d = END_DATES.get(t.getName());
+                    if (d != null) { t.setEndDate(LocalDate.parse(d)); tournamentRepo.save(t); }
+                });
+            }
+            if (groupStageMissing0)    seedGroupStage();
+            if (completedElimMissing0) seedCompletedElimination();
+            if (prizesMissing0)        seedPrizes();
+
             if (teamInfoMissing) {
                 record TI(String city, int year, List<String> history) {}
                 Map<String, TI> TEAM_INFO = Map.ofEntries(
@@ -292,6 +333,8 @@ public class DataInitializer implements CommandLineRunner {
                     }
                 });
             }
+
+            if (expansionMissing) seedExpansion();
 
             return;
         }
@@ -404,6 +447,10 @@ public class DataInitializer implements CommandLineRunner {
         seedBattleRoyale();
         seedHistory();
         seedElimination();
+        seedGroupStage();
+        seedCompletedElimination();
+        seedPrizes();
+        seedExpansion();
     }
 
     // ── Racing seed ────────────────────────────────────────────────────────────
@@ -628,15 +675,20 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private Tournament tournament(String name, String game, String status, String startDate, Team... teams) {
-        return tournament(name, game, inferSpecificGame(name, game), "LEAGUE", status, startDate, teams);
+        return tournament(name, game, inferSpecificGame(name, game), "LEAGUE", status, startDate, null, teams);
     }
 
     private Tournament tournament(String name, String game, String specificGame, String format, String status, String startDate, Team... teams) {
+        return tournament(name, game, specificGame, format, status, startDate, null, teams);
+    }
+
+    private Tournament tournament(String name, String game, String specificGame, String format, String status, String startDate, String endDate, Team... teams) {
         Tournament t = new Tournament(name, game);
         t.setSpecificGame(specificGame);
         t.setFormat(format);
         t.setStatus(status);
         t.setStartDate(LocalDate.parse(startDate));
+        if (endDate != null) t.setEndDate(LocalDate.parse(endDate));
         for (Team team : teams) t.getParticipatingTeams().add(team);
         return t;
     }
@@ -707,6 +759,257 @@ public class DataInitializer implements CommandLineRunner {
         return new Match(a, b, LocalDate.parse(date), t);
     }
 
+    // ── Expansion seed (4 teams + 2 specific games per modality) ────────────────
+    // Brings every discipline up to 4 teams across two real titles so the dashboard
+    // game filter is populated and tournaments are proper multi-team events.
+
+    private void seedExpansion() {
+        if (teamRepo.findAll().stream().anyMatch(t -> "Crimson Vipers".equals(t.getName()))) return;
+
+        Map<String, Team> tm = new HashMap<>();
+        teamRepo.findAll().forEach(x -> tm.put(x.getName(), x));
+        Team phantom = tm.get("Phantom Squad"), nexus = tm.get("Team Nexus"), storm = tm.get("Storm Raiders");
+        Team echo = tm.get("Echo Strike"), iron = tm.get("Iron Wolves");
+        Team apex = tm.get("Apex Horizon");
+        Team nitro = tm.get("Nitro Kings"), velocity = tm.get("Velocity Grid");
+        Team zoneCtrl = tm.get("Zone Control"), dropZone = tm.get("Drop Zone");
+
+        // ── New teams (points = wins * 3, matching the base seed convention) ─────
+        Team vipers = team("Crimson Vipers",   12, 4, 5); vipers.setNationality("France");         vipers.setGame("FPS");           vipers.setCity("Paris");          vipers.setFoundedYear(2022);
+        Team frost  = team("Frost Giants",      15, 5, 3); frost.setNationality("Finland");         frost.setGame("MOBA");           frost.setCity("Helsinki");        frost.setFoundedYear(2021); frost.setTrophies(1);
+        Team mystic = team("Mystic Order",      12, 4, 4); mystic.setNationality("South Korea");    mystic.setGame("MOBA");          mystic.setCity("Daejeon");        mystic.setFoundedYear(2022);
+        Team golden = team("Golden Boot FC",    12, 4, 2); golden.setNationality("Brazil");         golden.setGame("EFOOTBALL");     golden.setCity("Rio de Janeiro"); golden.setFoundedYear(2022); golden.setTrophies(1);
+        Team tiki   = team("Tiki Taka United",   9, 3, 3); tiki.setNationality("Spain");            tiki.setGame("EFOOTBALL");       tiki.setCity("Seville");          tiki.setFoundedYear(2021);
+        Team netb   = team("Net Breakers",       6, 2, 4); netb.setNationality("England");          netb.setGame("EFOOTBALL");       netb.setCity("Manchester");       netb.setFoundedYear(2023);
+        Team apexR  = team("Apex Racers",       12, 4, 4); apexR.setNationality("United Kingdom");   apexR.setGame("RACING");         apexR.setCity("London");          apexR.setFoundedYear(2022);
+        Team turbo  = team("Turbo Dynasty",     15, 5, 3); turbo.setNationality("Japan");           turbo.setGame("RACING");         turbo.setCity("Suzuka");          turbo.setFoundedYear(2021); turbo.setTrophies(1);
+        Team finalC = team("Final Circle",       9, 3, 2); finalC.setNationality("USA");            finalC.setGame("BATTLE_ROYALE"); finalC.setCity("Austin");         finalC.setFoundedYear(2022); finalC.setTrophies(1);
+        Team surge  = team("Storm Surge",        6, 2, 3); surge.setNationality("Canada");          surge.setGame("BATTLE_ROYALE");  surge.setCity("Toronto");         surge.setFoundedYear(2023);
+        teamRepo.saveAll(List.of(vipers, frost, mystic, golden, tiki, netb, apexR, turbo, finalC, surge));
+
+        // ── Coaches ──────────────────────────────────────────────────────────────
+        coachRepo.saveAll(List.of(
+            coach("Pierre Lefèvre", "p.lefevre@crimsonvipers.gg", vipers, "France",         "Lyon",      "1986-04-12", "FPS"),
+            coach("Veikko Laine",   "v.laine@frostgiants.gg",     frost,  "Finland",        "Tampere",   "1987-02-20", "MOBA"),
+            coach("Seung-min Oh",   "s.oh@mysticorder.gg",        mystic, "South Korea",    "Daegu",     "1989-11-15", "MOBA"),
+            coach("Roberto Alves",  "r.alves@goldenboot.gg",      golden, "Brazil",         "Rio de Janeiro", "1985-07-19", "EFOOTBALL"),
+            coach("Xavi Moreno",    "x.moreno@tikitaka.gg",       tiki,   "Spain",          "Madrid",    "1983-10-05", "EFOOTBALL"),
+            coach("Gary Sutton",    "g.sutton@netbreakers.gg",    netb,   "England",        "Liverpool", "1980-01-28", "EFOOTBALL"),
+            coach("James Whitfield","j.whitfield@apexracers.gg",  apexR,  "United Kingdom", "Oxford",    "1982-08-14", "RACING"),
+            coach("Kenji Mori",     "k.mori@turbodynasty.gg",     turbo,  "Japan",          "Nagoya",    "1984-03-22", "RACING"),
+            coach("Chris Donovan",  "c.donovan@finalcircle.gg",   finalC, "USA",            "Dallas",    "1986-09-03", "BATTLE_ROYALE"),
+            coach("Marc Tremblay",  "m.tremblay@stormsurge.gg",   surge,  "Canada",         "Montreal",  "1985-12-20", "BATTLE_ROYALE")
+        ));
+
+        // ── Players (5 per team) + roster achievements ─────────────────────────────
+        playerRepo.saveAll(withAchievement(List.of(
+            fps("Étienne Moreau", "etiboi",  vipers, 12, 7, 5, 70.1, 245, 73.0, 150.2, "France",               "Paris",    LocalDate.of(2001,  2, 11)),
+            fps("Noah Becker",    "nBecker", vipers, 11, 6, 5, 67.5, 188, 69.8, 139.5, "Germany",              "Cologne",  LocalDate.of(2002,  5, 19)),
+            fps("Mateo Greco",    "teoR",    vipers, 13, 8, 5, 72.3, 270, 75.1, 158.0, "Italy",                "Florence", LocalDate.of(2000,  8, 23)),
+            fps("Amir Haddad",    "ariaH",   vipers, 10, 5, 5, 66.2, 150, 67.9, 130.4, "United Arab Emirates", "Dubai",    LocalDate.of(2003,  1,  7)),
+            fps("Tobias Berg",    "tBerg",   vipers, 12, 6, 6, 69.0, 210, 71.2, 145.7, "Norway",               "Bergen",   LocalDate.of(2001, 11, 30))
+        ), "Runner-Up — CS2 Major 2025"));
+
+        playerRepo.saveAll(withAchievement(List.of(
+            moba("Aleksi Korhonen", "aleksiMid", frost, 10, 6, 4, "Ahri",     78, 52,  69, "Finland", "Helsinki", LocalDate.of(2000,  3, 12)),
+            moba("Bjorn Dahl",      "bjornTop",  frost, 10, 6, 4, "Ornn",     41, 58,  88, "Sweden",  "Malmö",    LocalDate.of(2001,  7,  8)),
+            moba("Wei Chen",        "weiADC",    frost, 10, 6, 4, "Kai'Sa",   95, 49,  52, "China",   "Chengdu",  LocalDate.of(2002,  9, 15)),
+            moba("Liam O'Brien",    "liamJG",    frost, 10, 6, 4, "Vi",       67, 61,  77, "Ireland", "Cork",     LocalDate.of(2000, 12, 22)),
+            moba("Sofia Lindqvist", "sofiSup",   frost, 10, 6, 4, "Nautilus", 18, 47, 121, "Sweden",  "Uppsala",  LocalDate.of(2003,  4,  3))
+        ), "Champion — Dota 2 International 2025"));
+
+        playerRepo.saveAll(withAchievement(List.of(
+            moba("Do-yun Han",  "doyunMid", mystic, 8, 4, 4, "Syndra", 84, 54,  61, "South Korea", "Daejeon", LocalDate.of(2001,  6, 18)),
+            moba("Marco Russo", "grecoTop", mystic, 8, 4, 4, "Aatrox", 49, 55,  73, "Italy",       "Bari",    LocalDate.of(2000, 10,  9)),
+            moba("Tunde Bello", "tundeADC", mystic, 8, 4, 4, "Jhin",   88, 46,  57, "Nigeria",     "Abuja",   LocalDate.of(2002,  2, 27)),
+            moba("Pablo Núñez", "pabloJG",  mystic, 8, 4, 4, "Elise",  72, 63,  69, "Argentina",   "Córdoba", LocalDate.of(2001,  5, 14)),
+            moba("Yara Saleh",  "yaraSup",  mystic, 8, 4, 4, "Lulu",   22, 41, 118, "Egypt",       "Alexandria", LocalDate.of(2003,  8, 21))
+        ), "Top 4 — Dota 2 International 2025"));
+
+        playerRepo.saveAll(withAchievement(List.of(
+            efb("Bruno Carvalho",   "brunoGoal", golden, 12, 8, 4, "ST",  28,  0,  9, 35,  7, "Brazil",    "Rio de Janeiro", LocalDate.of(2000,  4,  9)),
+            efb("Diego Fernández",  "diegoEF",   golden, 12, 8, 4, "CAM", 12,  0, 19, 18, 15, "Argentina", "Rosario",        LocalDate.of(2001,  8, 17)),
+            efb("Kenji Sato",       "kenjiEF",   golden, 12, 8, 4, "LW",  17,  0, 13, 23, 11, "Japan",     "Nagoya",         LocalDate.of(2002, 11, 25)),
+            efb("Andre Lima",       "andreGK",   golden, 12, 8, 4, "GK",   0, 33,  1,  0,  4, "Portugal",  "Coimbra",        LocalDate.of(1999,  3, 30)),
+            efb("Hugo Martins",     "hugoCB",    golden, 12, 8, 4, "CB",   2,  7,  4,  6, 28, "Portugal",  "Setúbal",        LocalDate.of(2003,  6, 12))
+        ), "Champion — EA FC Winter Cup 2025"));
+
+        playerRepo.saveAll(withAchievement(List.of(
+            efb("Sergio Vidal",   "sergioTT",  tiki, 10, 6, 4, "ST",  25,  0, 10, 30,  8, "Spain",   "Seville", LocalDate.of(2000,  9,  5)),
+            efb("Pol Garcia",     "polGarcia", tiki, 10, 6, 4, "CM",   6,  0, 16, 13, 22, "Spain",   "Girona",  LocalDate.of(2002,  1, 19)),
+            efb("Yassine Benali", "yassEF",    tiki, 10, 6, 4, "RW",  19,  0, 12, 25, 10, "Morocco", "Rabat",   LocalDate.of(2001,  7, 28)),
+            efb("Iker Mendoza",   "ikerGK",    tiki, 10, 6, 4, "GK",   0, 29,  2,  0,  5, "Spain",   "Bilbao",  LocalDate.of(1999, 12, 14)),
+            efb("Luca Conti",     "lucaCB",    tiki, 10, 6, 4, "CB",   3,  9,  5,  7, 26, "Italy",   "Genoa",   LocalDate.of(2003,  3,  8))
+        ), "Top 4 — EA FC Winter Cup 2025"));
+
+        playerRepo.saveAll(withAchievement(List.of(
+            efb("Jordan Clarke", "jClarkeEF", netb, 9, 4, 5, "ST",  23,  0,  8, 28,  9, "England",  "Manchester", LocalDate.of(2000,  5, 27)),
+            efb("Oliver Hughes", "olliEF",    netb, 9, 4, 5, "CAM",  8,  0, 14, 14, 20, "Wales",    "Cardiff",    LocalDate.of(2002,  8, 11)),
+            efb("Femi Adebayo",  "femiEF",    netb, 9, 4, 5, "LW",  16,  0, 11, 22, 12, "Nigeria",  "Ibadan",     LocalDate.of(2001, 10,  3)),
+            efb("Ryan Scott",    "ryanGK",    netb, 9, 4, 5, "GK",   0, 27,  1,  0,  6, "Scotland", "Glasgow",    LocalDate.of(1999,  2, 22)),
+            efb("Daniel Webb",   "danWebbCB", netb, 9, 4, 5, "CB",   2,  6,  4,  6, 24, "England",  "Leeds",      LocalDate.of(2003,  9, 16))
+        ), "Top 4 — EA FC Winter Cup 2025"));
+
+        playerRepo.saveAll(withAchievement(List.of(
+            racing("Oliver Grant",  "oGrant_ar", apexR, 8, 4, 4, 2.6, 5, 4, 2, "United Kingdom", "London",    LocalDate.of(2000,  6, 15)),
+            racing("Lucas Meyer",   "meyerGP",   apexR, 8, 4, 4, 4.0, 3, 2, 3, "Switzerland",    "Zurich",    LocalDate.of(2001,  9, 22)),
+            racing("Theo Laurent",  "theoRace",  apexR, 8, 4, 4, 5.5, 2, 3, 2, "France",         "Marseille", LocalDate.of(2002, 12, 30)),
+            racing("Mads Nielsen",  "madsGP",    apexR, 8, 4, 4, 7.1, 1, 1, 4, "Denmark",        "Aarhus",    LocalDate.of(2000,  2,  7)),
+            racing("Rui Tavares",   "ruiAR",     apexR, 8, 4, 4, 8.8, 0, 1, 5, "Portugal",       "Porto",     LocalDate.of(2003,  5, 19))
+        ), "Runner-Up — Gran Turismo Champions 2025"));
+
+        playerRepo.saveAll(withAchievement(List.of(
+            racing("Haruto Kobayashi", "harutoTD", turbo, 8, 5, 3, 1.9, 7, 6, 1, "Japan",       "Suzuka",    LocalDate.of(1999, 10, 12)),
+            racing("Ren Watanabe",     "renGP",    turbo, 8, 5, 3, 3.4, 4, 3, 2, "Japan",       "Yokohama",  LocalDate.of(2001,  3, 28)),
+            racing("Sung-ho Park",     "sunghoTD", turbo, 8, 5, 3, 5.0, 3, 4, 3, "South Korea", "Ulsan",     LocalDate.of(2000,  7, 16)),
+            racing("Felipe Costa",     "felipeGP", turbo, 8, 5, 3, 6.6, 2, 2, 4, "Brazil",      "Curitiba",  LocalDate.of(2002,  5,  9)),
+            racing("Aiden Murphy",     "aidenTD",  turbo, 8, 5, 3, 8.5, 0, 1, 6, "Australia",   "Melbourne", LocalDate.of(2003, 11,  1))
+        ), "Champion — Gran Turismo Champions 2025"));
+
+        playerRepo.saveAll(withAchievement(List.of(
+            br("Tyler Brooks",      "tBrooks_fc", finalC, 5, 3, 2, 3.0, 195, 79.0, 910.0, "USA",     "Austin",       LocalDate.of(2000,  4, 21)),
+            br("Sasha Ivanova",     "sashaBR",    finalC, 5, 3, 2, 4.5, 150, 72.0, 760.0, "Russia",  "Novosibirsk",  LocalDate.of(2001,  9, 13)),
+            br("Mohammed Al-Farsi", "mFarsi_fc",  finalC, 5, 3, 2, 6.0, 128, 66.0, 640.0, "United Arab Emirates", "Abu Dhabi", LocalDate.of(2002, 12,  5)),
+            br("Lena Schulz",       "lenaBR",     finalC, 5, 3, 2, 4.0, 162, 75.0, 820.0, "Germany", "Stuttgart",    LocalDate.of(2000,  7, 30)),
+            br("Diego Torres",      "dTorres_fc", finalC, 5, 3, 2, 7.0, 105, 60.0, 560.0, "Mexico",  "Guadalajara",  LocalDate.of(2003,  2, 18))
+        ), "Champion — Fortnite World Cup 2025"));
+
+        playerRepo.saveAll(withAchievement(List.of(
+            br("Ethan Wright",   "ethanSS", surge, 5, 2, 3, 3.5, 175, 76.0, 850.0, "Canada",  "Toronto",      LocalDate.of(2001,  6,  9)),
+            br("Mei Lin",        "meiSS",   surge, 5, 2, 3, 5.0, 140, 70.0, 710.0, "Taiwan",  "Taipei",       LocalDate.of(2002, 10, 27)),
+            br("Karim Haddad",   "karimSS", surge, 5, 2, 3, 6.5, 118, 63.0, 600.0, "Lebanon", "Tripoli",      LocalDate.of(2000,  3, 14)),
+            br("Olga Sokolova",  "olgaSS",  surge, 5, 2, 3, 4.2, 158, 74.0, 790.0, "Russia",  "Yekaterinburg", LocalDate.of(2001, 11, 19)),
+            br("Bayo Okoro",     "bayoSS",  surge, 5, 2, 3, 7.2,  98, 58.0, 530.0, "Nigeria", "Port Harcourt", LocalDate.of(2003,  8,  7))
+        ), "Runner-Up — Fortnite World Cup 2025"));
+
+        // ── Tournaments + matches (ordered strongest-first for the round-robin) ────
+        List<Team> fpsTeams    = List.of(phantom, vipers, nexus, storm);
+        List<Team> mobaTeams   = List.of(frost, mystic, echo, iron);
+        List<Team> efbTeams    = List.of(golden, apex, tiki, netb);
+        List<Team> racingTeams = List.of(nitro, turbo, apexR, velocity);
+        List<Team> brTeams     = List.of(zoneCtrl, finalC, dropZone, surge);
+
+        // FPS — Valorant + CS2
+        league("Valorant Masters 2026", "FPS", "Valorant", "ACTIVE",    "2026-05-01", null,        4, 13,  8, "€18,000", "€7,000", "€3,000", fpsTeams);
+        league("CS2 Pro League 2026",   "FPS", "CS2",      "ACTIVE",    "2026-05-05", null,        4, 13,  8, "€16,000", "€6,000", "€2,500", fpsTeams);
+        league("CS2 Major 2025",        "FPS", "CS2",      "COMPLETED", "2025-11-01", "2025-11-20", 6, 13,  8, "€20,000", "€8,000", "€3,000", fpsTeams);
+
+        // MOBA — League of Legends + Dota 2
+        league("LoL Champions Arena 2026", "MOBA", "League of Legends", "ACTIVE",    "2026-05-02", null,        4, 28, 17, "€18,000", "€7,000", "€3,000", mobaTeams);
+        league("Dota 2 Pro Circuit 2026",  "MOBA", "Dota 2",            "ACTIVE",    "2026-05-06", null,        4, 31, 22, "€20,000", "€8,000", "€3,500", mobaTeams);
+        league("Dota 2 International 2025", "MOBA", "Dota 2",            "COMPLETED", "2025-10-01", "2025-10-22", 6, 31, 22, "€25,000", "€10,000", "€4,000", mobaTeams);
+
+        // eFootball — FIFA + EA FC 25
+        league("FIFA Champions Cup 2026", "EFOOTBALL", "FIFA",     "ACTIVE",    "2026-05-03", null,        4, 3, 1, "€12,000", "€5,000", "€2,000", efbTeams);
+        league("EA FC Pro League 2026",   "EFOOTBALL", "EA FC 25", "ACTIVE",    "2026-05-07", null,        4, 3, 1, "€14,000", "€6,000", "€2,500", efbTeams);
+        league("EA FC Winter Cup 2025",   "EFOOTBALL", "EA FC 25", "COMPLETED", "2025-12-01", "2025-12-18", 6, 3, 1, "€16,000", "€6,000", "€2,500", efbTeams);
+
+        // Racing — iRacing + Gran Turismo 7
+        league("iRacing Grand Prix 2026",        "RACING", "iRacing",        "ACTIVE",    "2026-05-04", null,        4, 38, 26, "€10,000", "€4,000", "€2,000", racingTeams);
+        league("Gran Turismo World Tour 2026",   "RACING", "Gran Turismo 7", "ACTIVE",    "2026-05-08", null,        4, 40, 28, "€12,000", "€5,000", "€2,500", racingTeams);
+        league("Gran Turismo Champions 2025",    "RACING", "Gran Turismo 7", "COMPLETED", "2025-11-05", "2025-11-25", 6, 40, 28, "€14,000", "€6,000", "€3,000", racingTeams);
+
+        // Battle Royale — PUBG + Fortnite
+        league("PUBG Global Series 2026",      "BATTLE_ROYALE", "PUBG",     "ACTIVE",    "2026-05-05", null,        4, 48, 33, "€15,000", "€6,000", "€2,500", brTeams);
+        league("Fortnite Champion Series 2026","BATTLE_ROYALE", "Fortnite", "ACTIVE",    "2026-05-09", null,        4, 52, 36, "€18,000", "€7,000", "€3,000", brTeams);
+        league("Fortnite World Cup 2025",      "BATTLE_ROYALE", "Fortnite", "COMPLETED", "2025-10-10", "2025-10-30", 6, 52, 36, "€20,000", "€8,000", "€3,000", brTeams);
+    }
+
+    private List<Player> withAchievement(List<Player> players, String... achievements) {
+        players.forEach(pl -> {
+            List<String> list = new ArrayList<>(pl.getAchievements() != null ? pl.getAchievements() : List.of());
+            for (String a : achievements) if (!list.contains(a)) list.add(a);
+            pl.setAchievements(list);
+        });
+        return players;
+    }
+
+    private void league(String name, String game, String specificGame, String status,
+                        String startDate, String endDate, int playedCount,
+                        int winScore, int loseScore, String p1, String p2, String p3, List<Team> teams) {
+        Team[] arr = teams.toArray(new Team[0]);
+        Tournament t = endDate == null
+            ? tournament(name, game, specificGame, "LEAGUE", status, startDate, arr)
+            : tournament(name, game, specificGame, "LEAGUE", status, startDate, endDate, arr);
+        if (p1 != null) t.setPrizeFirst(p1);
+        if (p2 != null) t.setPrizeSecond(p2);
+        if (p3 != null) t.setPrizeThird(p3);
+        tournamentRepo.save(t);
+        matchRepo.saveAll(roundRobinMatches(t, teams, playedCount, winScore, loseScore, startDate));
+    }
+
+    // Single round-robin; the first `playedCount` fixtures are recorded (stronger team wins),
+    // the remainder are left as upcoming. Fixtures are spaced 3 days apart from the start date.
+    private List<Match> roundRobinMatches(Tournament t, List<Team> teams, int playedCount,
+                                          int winScore, int loseScore, String startDate) {
+        List<Match> out = new ArrayList<>();
+        LocalDate d = LocalDate.parse(startDate);
+        int idx = 0;
+        for (int i = 0; i < teams.size(); i++) {
+            for (int j = i + 1; j < teams.size(); j++) {
+                Team a = teams.get(i), b = teams.get(j);
+                if (idx < playedCount) {
+                    if (a.getPoints() >= b.getPoints()) out.add(played(a, b, d.toString(), t, winScore, loseScore));
+                    else                                out.add(played(a, b, d.toString(), t, loseScore, winScore));
+                } else {
+                    out.add(upcoming(a, b, d.toString(), t));
+                }
+                d = d.plusDays(3);
+                idx++;
+            }
+        }
+        return out;
+    }
+
+    // ── Group Stage seed ───────────────────────────────────────────────────────
+
+    private void seedGroupStage() {
+        List<Team> allTeams = teamRepo.findAll();
+        Team nexus   = findTeam(allTeams, "Team Nexus");
+        Team storm   = findTeam(allTeams, "Storm Raiders");
+        Team phantom = findTeam(allTeams, "Phantom Squad");
+        if (nexus == null || storm == null || phantom == null) return;
+
+        Tournament t = tournament("Valorant Open Cup 2025", "FPS", "Valorant", "GROUP_STAGE", "COMPLETED", "2025-09-01", "2025-09-15", nexus, storm, phantom);
+        tournamentRepo.save(t);
+        matchRepo.saveAll(List.of(
+            played(nexus,   storm,   "2025-09-03", t, 13,  7),
+            played(phantom, storm,   "2025-09-05", t, 13,  5),
+            played(phantom, nexus,   "2025-09-08", t, 13, 10),
+            played(phantom, nexus,   "2025-09-15", t, 13,  8)
+        ));
+    }
+
+    // ── Completed Elimination seed ─────────────────────────────────────────────
+
+    private void seedCompletedElimination() {
+        List<Team> allTeams = teamRepo.findAll();
+        Team nexus    = findTeam(allTeams, "Team Nexus");
+        Team storm    = findTeam(allTeams, "Storm Raiders");
+        Team phantom  = findTeam(allTeams, "Phantom Squad");
+        Team dropZone = findTeam(allTeams, "Drop Zone");
+        Team zoneCtrl = findTeam(allTeams, "Zone Control");
+
+        if (nexus != null && storm != null && phantom != null) {
+            Tournament t1 = tournament("Valorant Autumn Knockout 2024", "FPS", "Valorant", "SINGLE_ELIMINATION", "COMPLETED", "2024-10-01", "2024-10-15", phantom, nexus, storm);
+            tournamentRepo.save(t1);
+            matchRepo.saveAll(List.of(
+                played(nexus,   storm,  "2024-10-05", t1, 13,  8),
+                played(phantom, nexus,  "2024-10-15", t1, 13, 10)
+            ));
+        }
+
+        if (dropZone != null && zoneCtrl != null) {
+            Tournament t2 = tournament("BR Double Trouble 2024", "BATTLE_ROYALE", "PUBG", "DOUBLE_ELIMINATION", "COMPLETED", "2024-09-01", "2024-09-20", zoneCtrl, dropZone);
+            tournamentRepo.save(t2);
+            matchRepo.saveAll(List.of(
+                played(zoneCtrl, dropZone, "2024-09-05", t2, 45, 32),
+                played(dropZone, zoneCtrl, "2024-09-12", t2, 38, 35),
+                played(zoneCtrl, dropZone, "2024-09-20", t2, 51, 30)
+            ));
+        }
+    }
+
     // ── History seed (past tournaments, matches, achievements, career stats) ──
 
     private void seedHistory() {
@@ -729,7 +1032,7 @@ public class DataInitializer implements CommandLineRunner {
 
         // ── PAST FPS ──────────────────────────────────────────────────────────
         // Valorant Champions 2025: Phantom wins, Nexus 2nd, Storm 3rd
-        Tournament vc2025 = tournament("Valorant Champions 2025", "FPS", "COMPLETED", "2025-01-15", nexus, storm, phantom);
+        Tournament vc2025 = tournament("Valorant Champions 2025", "FPS", "Valorant", "LEAGUE", "COMPLETED", "2025-01-15", "2025-01-25", nexus, storm, phantom);
         tournamentRepo.save(vc2025);
         matchRepo.saveAll(List.of(
             played(phantom, storm,  "2025-01-18", vc2025, 13,  7),
@@ -739,7 +1042,7 @@ public class DataInitializer implements CommandLineRunner {
         ));
 
         // Valorant World Cup 2024: Nexus wins, Phantom 2nd, Storm 3rd
-        Tournament vwc2024 = tournament("Valorant World Cup 2024", "FPS", "COMPLETED", "2024-05-01", nexus, storm, phantom);
+        Tournament vwc2024 = tournament("Valorant World Cup 2024", "FPS", "Valorant", "LEAGUE", "COMPLETED", "2024-05-01", "2024-05-12", nexus, storm, phantom);
         tournamentRepo.save(vwc2024);
         matchRepo.saveAll(List.of(
             played(nexus,   storm,   "2024-05-05", vwc2024, 13,  9),
@@ -750,7 +1053,7 @@ public class DataInitializer implements CommandLineRunner {
 
         // ── PAST MOBA ─────────────────────────────────────────────────────────
         // LoL Spring Championship 2025: Echo wins, Iron 2nd, Nexus 3rd
-        Tournament lsc2025 = tournament("LoL Spring Championship 2025", "MOBA", "COMPLETED", "2025-02-01", iron, echo, nexus);
+        Tournament lsc2025 = tournament("LoL Spring Championship 2025", "MOBA", "League of Legends", "LEAGUE", "COMPLETED", "2025-02-01", "2025-02-12", iron, echo, nexus);
         tournamentRepo.save(lsc2025);
         matchRepo.saveAll(List.of(
             played(echo,  iron,  "2025-02-05", lsc2025, 28, 15),
@@ -760,7 +1063,7 @@ public class DataInitializer implements CommandLineRunner {
         ));
 
         // LoL Pro League 2024: Iron wins, Echo 2nd (best-of-5 tiebreak)
-        Tournament lpl2024 = tournament("LoL Pro League 2024", "MOBA", "COMPLETED", "2024-03-15", iron, echo);
+        Tournament lpl2024 = tournament("LoL Pro League 2024", "MOBA", "League of Legends", "LEAGUE", "COMPLETED", "2024-03-15", "2024-03-31", iron, echo);
         tournamentRepo.save(lpl2024);
         matchRepo.saveAll(List.of(
             played(iron, echo, "2024-03-18", lpl2024, 25, 17),
@@ -772,7 +1075,7 @@ public class DataInitializer implements CommandLineRunner {
 
         // ── PAST eFOOTBALL ────────────────────────────────────────────────────
         // FIFA World Cup Sim 2025: Apex wins, Storm 2nd
-        Tournament fwcs2025 = tournament("FIFA World Cup Sim 2025", "eFootball", "COMPLETED", "2025-01-20", apex, storm);
+        Tournament fwcs2025 = tournament("FIFA World Cup Sim 2025", "EFOOTBALL", "FIFA", "LEAGUE", "COMPLETED", "2025-01-20", "2025-01-26", apex, storm);
         tournamentRepo.save(fwcs2025);
         matchRepo.saveAll(List.of(
             played(apex,  storm, "2025-01-22", fwcs2025, 3, 1),
@@ -781,7 +1084,7 @@ public class DataInitializer implements CommandLineRunner {
         ));
 
         // FIFA eLeague 2024: Storm wins, Apex 2nd (best-of-5)
-        Tournament fel2024 = tournament("FIFA eLeague 2024", "eFootball", "COMPLETED", "2024-06-01", apex, storm);
+        Tournament fel2024 = tournament("FIFA eLeague 2024", "EFOOTBALL", "FIFA", "LEAGUE", "COMPLETED", "2024-06-01", "2024-06-19", apex, storm);
         tournamentRepo.save(fel2024);
         matchRepo.saveAll(List.of(
             played(storm, apex,  "2024-06-05", fel2024, 2, 1),
@@ -793,7 +1096,7 @@ public class DataInitializer implements CommandLineRunner {
 
         // ── PAST RACING ───────────────────────────────────────────────────────
         // SimRacing World Cup 2025: Nitro wins, Velocity 2nd (3-2)
-        Tournament src2025 = tournament("SimRacing World Cup 2025", "Racing", "COMPLETED", "2025-03-01", velocity, nitro);
+        Tournament src2025 = tournament("SimRacing World Cup 2025", "RACING", "iRacing", "LEAGUE", "COMPLETED", "2025-03-01", "2025-04-05", velocity, nitro);
         tournamentRepo.save(src2025);
         matchRepo.saveAll(List.of(
             played(nitro,    velocity, "2025-03-08", src2025, 38, 25),
@@ -804,7 +1107,7 @@ public class DataInitializer implements CommandLineRunner {
         ));
 
         // SimRacing Pro League 2024: Velocity wins, Nitro 2nd (4-2)
-        Tournament srp2024 = tournament("SimRacing Pro League 2024", "Racing", "COMPLETED", "2024-03-15", velocity, nitro);
+        Tournament srp2024 = tournament("SimRacing Pro League 2024", "RACING", "iRacing", "LEAGUE", "COMPLETED", "2024-03-15", "2024-04-26", velocity, nitro);
         tournamentRepo.save(srp2024);
         matchRepo.saveAll(List.of(
             played(velocity, nitro,    "2024-03-22", srp2024, 31, 24),
@@ -817,7 +1120,7 @@ public class DataInitializer implements CommandLineRunner {
 
         // ── PAST BATTLE ROYALE ────────────────────────────────────────────────
         // BR World Series 2025: Zone Control wins, Drop Zone 2nd (3-2)
-        Tournament brws2025 = tournament("BR World Series 2025", "BattleRoyale", "COMPLETED", "2025-05-01", dropZone, zoneCtrl);
+        Tournament brws2025 = tournament("BR World Series 2025", "BATTLE_ROYALE", "PUBG", "LEAGUE", "COMPLETED", "2025-05-01", "2025-06-05", dropZone, zoneCtrl);
         tournamentRepo.save(brws2025);
         matchRepo.saveAll(List.of(
             played(zoneCtrl, dropZone, "2025-05-08", brws2025, 49, 35),
@@ -828,7 +1131,7 @@ public class DataInitializer implements CommandLineRunner {
         ));
 
         // BR Nations Cup 2024: Drop Zone wins, Zone Control 2nd (3-2)
-        Tournament brnc2024 = tournament("BR Nations Cup 2024", "BattleRoyale", "COMPLETED", "2024-05-01", dropZone, zoneCtrl);
+        Tournament brnc2024 = tournament("BR Nations Cup 2024", "BATTLE_ROYALE", "PUBG", "LEAGUE", "COMPLETED", "2024-05-01", "2024-06-05", dropZone, zoneCtrl);
         tournamentRepo.save(brnc2024);
         matchRepo.saveAll(List.of(
             played(dropZone, zoneCtrl, "2024-05-08", brnc2024, 45, 39),
@@ -1003,5 +1306,42 @@ public class DataInitializer implements CommandLineRunner {
         p.setCity(city);
         p.setBirthDate(birthDate);
         return p;
+    }
+
+    // ── Prizes seed ────────────────────────────────────────────────────────────
+
+    private void seedPrizes() {
+        Map<String, String[]> PRIZES = Map.ofEntries(
+            Map.entry("Valorant Champions 2025",           new String[]{"€15,000", "€7,000",  "€3,000"}),
+            Map.entry("Valorant World Cup 2024",            new String[]{"€12,000", "€5,000",  "€2,000"}),
+            Map.entry("Valorant Autumn Knockout 2024",      new String[]{"Trophy",  null,       null}),
+            Map.entry("Valorant Open Cup 2025",             new String[]{"€5,000",  "€2,000",  null}),
+            Map.entry("Valorant Spring Cup 2026",           new String[]{"€20,000", "€8,000",  "€3,000"}),
+            Map.entry("Valorant Spring Invitational 2026",  new String[]{"€10,000", "€4,000",  null}),
+            Map.entry("LoL Spring Championship 2025",       new String[]{"€15,000", "€6,000",  "€2,500"}),
+            Map.entry("LoL Pro League 2024",                new String[]{"€12,000", "€5,000",  "€2,000"}),
+            Map.entry("LoL Summer League 2026",             new String[]{"€18,000", "€7,000",  "€3,000"}),
+            Map.entry("LoL Knockout Cup 2026",              new String[]{"Trophy",  null,       null}),
+            Map.entry("FIFA World Cup Sim 2025",            new String[]{"€10,000", "€4,000",  null}),
+            Map.entry("FIFA eLeague 2024",                  new String[]{"€8,000",  "€3,000",  null}),
+            Map.entry("FIFA eLeague 2026",                  new String[]{"€12,000", "€5,000",  "€2,000"}),
+            Map.entry("SimRacing World Cup 2025",           new String[]{"€8,000",  "€3,000",  "€1,500"}),
+            Map.entry("SimRacing Pro League 2024",          new String[]{"€6,000",  "€2,500",  "€1,000"}),
+            Map.entry("SimRacing Pro League 2026",          new String[]{"€10,000", "€4,000",  "€2,000"}),
+            Map.entry("BR World Series 2025",               new String[]{"€12,000", "€5,000",  "€2,500"}),
+            Map.entry("BR Nations Cup 2024",                new String[]{"€10,000", "€4,000",  "€2,000"}),
+            Map.entry("Battle Royale World Series 2026",    new String[]{"€15,000", "€6,000",  "€2,500"}),
+            Map.entry("BR Invitational 2026",               new String[]{"Trophy + €3,000", null, null}),
+            Map.entry("BR Double Trouble 2024",             new String[]{"Trophy",  null,       null})
+        );
+        tournamentRepo.findAll().forEach(t -> {
+            if (t.getPrizeFirst() != null) return;
+            String[] prizes = PRIZES.get(t.getName());
+            if (prizes == null) return;
+            t.setPrizeFirst(prizes[0]);
+            if (prizes.length > 1 && prizes[1] != null) t.setPrizeSecond(prizes[1]);
+            if (prizes.length > 2 && prizes[2] != null) t.setPrizeThird(prizes[2]);
+            tournamentRepo.save(t);
+        });
     }
 }

@@ -3,13 +3,13 @@ import { createPortal } from 'react-dom'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft, UserCheck, Users, Trophy,
-  Crosshair, Sword, Footprints, Star, Car, Skull, Edit2,
+  Crosshair, Sword, Swords, Footprints, Star, Car, Skull, Edit2,
   MapPin, Calendar, Building2, History, UserPlus, X, Search
 } from 'lucide-react'
 import Badge from '../components/Badge'
 import Modal from '../components/Modal'
 import { useToast } from '../components/Toast'
-import { teamApi, tournamentApi, playerApi, coachApi } from '../services/api'
+import { teamApi, tournamentApi, playerApi, coachApi, matchApi } from '../services/api'
 import { teamEmoji } from '../utils/teamEmoji'
 
 const TYPE_META = {
@@ -87,6 +87,12 @@ const placementLabel = (pos) => {
   return { text: `#${pos}`, color: '#64748B' }
 }
 
+const fmtDate = (d) => {
+  if (!d) return '—'
+  try { return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) }
+  catch { return d }
+}
+
 export default function TeamDetail() {
   const { id } = useParams()
   const [team, setTeam]       = useState(null)
@@ -95,6 +101,9 @@ export default function TeamDetail() {
   const [form, setForm]       = useState({})
   const [saving, setSaving]   = useState(false)
   const [standings, setStandings] = useState({})
+  const [teamMatches, setTeamMatches] = useState([])
+  const matchContainerRef = useRef(null)
+  const matchItemRefs     = useRef([])
   const [showTrophies, setShowTrophies] = useState(false)
   const [trophyAnchor, setTrophyAnchor] = useState(null)
   const [showCoachHistory, setShowCoachHistory] = useState(false)
@@ -144,6 +153,32 @@ export default function TeamDetail() {
       } catch (e) { console.error('standings fetch failed', t.id, e) }
     })
   }, [team])
+
+  useEffect(() => {
+    if (!team) return
+    matchApi.getAll()
+      .then(r => {
+        const all = r.data || []
+        const mine = all
+          .filter(m => m.teamA?.id === team.id || m.teamB?.id === team.id)
+          .sort((a, b) => new Date(a.date) - new Date(b.date))
+        setTeamMatches(mine)
+      })
+      .catch(console.error)
+  }, [team])
+
+  useEffect(() => {
+    if (teamMatches.length === 0) return
+    const now = Date.now()
+    let best = 0, bestDiff = Infinity
+    teamMatches.forEach((m, i) => {
+      const diff = Math.abs(new Date(m.date) - now)
+      if (diff < bestDiff) { bestDiff = diff; best = i }
+    })
+    const el = matchItemRefs.current[best]
+    const container = matchContainerRef.current
+    if (el && container) container.scrollTop = Math.max(0, el.offsetTop - container.offsetTop - 8)
+  }, [teamMatches])
 
   const openEdit = () => {
     setForm({
@@ -252,10 +287,29 @@ export default function TeamDetail() {
 
   const players     = team.players || []
   const coach       = team.coach
-  const tournaments = team.tournaments || []
+  const tournaments = [...(team.tournaments || [])].sort((a, b) => {
+    const da = a.startDate ? new Date(a.startDate) : new Date(0)
+    const db = b.startDate ? new Date(b.startDate) : new Date(0)
+    return db - da
+  })
   const coachHistory = team.coachHistory || []
-  const total       = team.wins + team.losses
-  const winRate     = total > 0 ? Math.round((team.wins / total) * 100) : 0
+
+  // Derive W/L/total from actual match history once loaded (stored values are stale seeds)
+  const playedMatches  = teamMatches.filter(m => m.resultRecorded)
+  const computedWins   = playedMatches.filter(m => {
+    const isA = m.teamA?.id === team.id
+    return isA ? m.teamAScore > m.teamBScore : m.teamBScore > m.teamAScore
+  }).length
+  const computedLosses = playedMatches.filter(m => {
+    const isA = m.teamA?.id === team.id
+    return isA ? m.teamAScore < m.teamBScore : m.teamBScore < m.teamAScore
+  }).length
+  const hasMatchData   = teamMatches.length > 0
+  const displayWins    = hasMatchData ? computedWins   : team.wins
+  const displayLosses  = hasMatchData ? computedLosses : team.losses
+  const total          = hasMatchData ? teamMatches.length : (team.wins + team.losses)
+  const winRate        = (displayWins + displayLosses) > 0
+    ? Math.round(displayWins / (displayWins + displayLosses) * 100) : 0
 
   const topPlayer = [...players].sort((a, b) => {
     const wr = p => (p.wins + p.losses) > 0 ? p.wins / (p.wins + p.losses) : 0
@@ -324,8 +378,8 @@ export default function TeamDetail() {
         {/* W/L bar */}
         <div className="mt-4 pt-4 border-t border-bg-border">
           <div className="flex items-center gap-3 mb-2">
-            <span className="font-display text-sm text-accent-green">{team.wins}<span className="font-body text-xs text-text-dim ml-1">W</span></span>
-            <span className="font-display text-sm text-red-400">{team.losses}<span className="font-body text-xs text-text-dim ml-1">L</span></span>
+            <span className="font-display text-sm text-accent-green">{displayWins}<span className="font-body text-xs text-text-dim ml-1">W</span></span>
+            <span className="font-display text-sm text-red-400">{displayLosses}<span className="font-body text-xs text-text-dim ml-1">L</span></span>
           </div>
           <div className="h-1.5 rounded-full bg-bg-primary overflow-hidden">
             <div className="h-full rounded-full transition-all duration-700"
@@ -538,6 +592,50 @@ export default function TeamDetail() {
           </div>
         </div>
       </div>
+
+      {/* Match History */}
+      {teamMatches.length > 0 && (
+        <div className="glass-card p-5 mt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Swords size={15} className="text-accent-cyan" />
+            <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Match History</h2>
+            <span className="font-body text-xs text-text-dim ml-1">({teamMatches.length})</span>
+          </div>
+          <div ref={matchContainerRef} className="space-y-1 max-h-80 overflow-y-auto pr-1">
+            {teamMatches.map((m, i) => {
+              const isA      = m.teamA?.id === team.id
+              const myScore  = isA ? m.teamAScore : m.teamBScore
+              const oppScore = isA ? m.teamBScore : m.teamAScore
+              const opponent = isA ? m.teamB : m.teamA
+              const won  = m.resultRecorded && myScore > oppScore
+              const lost = m.resultRecorded && oppScore > myScore
+              return (
+                <div key={m.id} ref={el => { matchItemRefs.current[i] = el }}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-bg-primary transition-colors duration-150">
+                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${!m.resultRecorded ? 'bg-text-dim' : won ? 'bg-accent-green' : lost ? 'bg-red-400' : 'bg-accent-cyan'}`} />
+                  <Link to={`/teams/${opponent?.id}`}
+                    className="font-body text-sm font-semibold text-text-primary hover:text-accent-green transition-colors truncate flex-1 min-w-0">
+                    {opponent?.name}
+                  </Link>
+                  {m.resultRecorded
+                    ? <span className={`font-display text-sm font-bold flex-shrink-0 ${won ? 'text-accent-green' : lost ? 'text-red-400' : 'text-accent-cyan'}`}>
+                        {myScore}:{oppScore}
+                      </span>
+                    : <span className="font-body text-xs text-text-dim flex-shrink-0">vs</span>}
+                  <Link to={`/tournaments/${m.tournament?.id}`}
+                    className="font-body text-xs text-text-dim hover:text-text-muted transition-colors truncate hidden sm:block max-w-[160px]">
+                    {m.tournament?.name}
+                  </Link>
+                  <span className="font-body text-xs text-text-dim flex-shrink-0">{fmtDate(m.date)}</span>
+                  {m.resultRecorded
+                    ? <Badge variant={won ? 'green' : lost ? 'red' : 'cyan'}>{won ? 'W' : lost ? 'L' : 'D'}</Badge>
+                    : <Badge variant="gray">Pending</Badge>}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Trophies popover */}
       {showTrophies && trophyAnchor && createPortal(

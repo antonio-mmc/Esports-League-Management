@@ -12,6 +12,7 @@ import CoachDetail       from './pages/CoachDetail'
 import Tournaments       from './pages/Tournaments'
 import TournamentDetail  from './pages/TournamentDetail'
 import Matches     from './pages/Matches'
+import MatchDetail from './pages/MatchDetail'
 
 export default function App() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/tournaments"     element={<Tournaments />}      />
             <Route path="/tournaments/:id" element={<TournamentDetail />} />
             <Route path="/matches"     element={<Matches />}     />
+            <Route path="/matches/:id" element={<MatchDetail />} />
           </Routes>
         </Layout>
       </ToastProvider>

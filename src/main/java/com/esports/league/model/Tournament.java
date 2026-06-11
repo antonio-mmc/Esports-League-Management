@@ -27,6 +27,11 @@ public class Tournament {
     private String specificGame; // e.g., Valorant, League of Legends, FIFA, iRacing, PUBG
 
     private LocalDate startDate;
+    private LocalDate endDate;
+
+    private String prizeFirst;
+    private String prizeSecond;
+    private String prizeThird;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
@@ -69,6 +74,18 @@ public class Tournament {
 
     public LocalDate getStartDate() { return startDate; }
     public void setStartDate(LocalDate startDate) { this.startDate = startDate; }
+
+    public LocalDate getEndDate() { return endDate; }
+    public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
+
+    public String getPrizeFirst() { return prizeFirst; }
+    public void setPrizeFirst(String prizeFirst) { this.prizeFirst = prizeFirst; }
+
+    public String getPrizeSecond() { return prizeSecond; }
+    public void setPrizeSecond(String prizeSecond) { this.prizeSecond = prizeSecond; }
+
+    public String getPrizeThird() { return prizeThird; }
+    public void setPrizeThird(String prizeThird) { this.prizeThird = prizeThird; }
 
     public List<Team> getParticipatingTeams() { return participatingTeams; }
     public void setParticipatingTeams(List<Team> participatingTeams) { this.participatingTeams = participatingTeams; }

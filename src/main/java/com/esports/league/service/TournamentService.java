@@ -81,6 +81,17 @@ public class TournamentService {
         tournament.setStatus(updated.getStatus());
         if (updated.getFormat() != null)       tournament.setFormat(updated.getFormat());
         if (updated.getSpecificGame() != null) tournament.setSpecificGame(updated.getSpecificGame());
+        tournament.setStartDate(updated.getStartDate());
+        tournament.setEndDate(updated.getEndDate());
+        tournament.setPrizeFirst(updated.getPrizeFirst());
+        tournament.setPrizeSecond(updated.getPrizeSecond());
+        tournament.setPrizeThird(updated.getPrizeThird());
+        if (updated.getParticipatingTeams() != null) {
+            tournament.getParticipatingTeams().clear();
+            updated.getParticipatingTeams().forEach(t ->
+                teamRepository.findById(t.getId()).ifPresent(tournament.getParticipatingTeams()::add)
+            );
+        }
         return tournamentRepository.save(tournament);
     }
 

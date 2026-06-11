@@ -1,6 +1,6 @@
 import { Loader2, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react'
 
-export default function DataTable({ columns, data, loading, emptyMessage = 'No data.', highlightFn, sortKey, sortDir, onSort }) {
+export default function DataTable({ columns, data, loading, emptyMessage = 'No data.', highlightFn, sortKey, sortDir, onSort, onRowClick }) {
   if (loading) {
     return (
       <div className="glass-card flex items-center justify-center py-20">
@@ -46,7 +46,8 @@ export default function DataTable({ columns, data, loading, emptyMessage = 'No d
                 const highlighted = highlightFn ? highlightFn(row) : false
                 return (
                   <tr key={row.id ?? i}
-                    className={`transition-colors duration-150 ${highlighted ? 'hover:bg-accent-green/5' : 'hover:bg-bg-primary/50'}`}
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    className={`transition-colors duration-150 ${onRowClick ? 'cursor-pointer' : ''} ${highlighted ? 'hover:bg-accent-green/5' : 'hover:bg-bg-primary/50'}`}
                     style={{
                       borderBottom: i < data.length - 1 ? '1px solid rgba(30,41,59,0.4)' : undefined,
                       ...(highlighted ? {
