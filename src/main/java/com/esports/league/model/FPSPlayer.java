@@ -14,10 +14,10 @@ public class FPSPlayer extends Player {
 
     public FPSPlayer() {}
 
-    public FPSPlayer(String fullName, String nickname, String password,
+    public FPSPlayer(String fullName, String nickname,
                      int matchesPlayed, int wins, int losses,
                      double accuracy, int headshots, double kast, double adr) {
-        super(fullName, nickname, password, matchesPlayed, wins, losses);
+        super(fullName, nickname, matchesPlayed, wins, losses);
         this.accuracy = accuracy;
         this.headshots = headshots;
         this.kast = kast;

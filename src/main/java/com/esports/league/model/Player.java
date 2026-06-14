@@ -42,7 +42,6 @@ public class Player {
     @Column(nullable = false, unique = true)
     private String nickname;
 
-    private String password;
     private int matchesPlayed;
     private int wins;
     private int losses;
@@ -62,14 +61,13 @@ public class Player {
 
     public Player() {}
 
-    public Player(String fullName, String nickname, String password) {
+    public Player(String fullName, String nickname) {
         this.fullName = fullName;
         this.nickname = nickname;
-        this.password = password;
     }
 
-    public Player(String fullName, String nickname, String password, int matchesPlayed, int wins, int losses) {
-        this(fullName, nickname, password);
+    public Player(String fullName, String nickname, int matchesPlayed, int wins, int losses) {
+        this(fullName, nickname);
         this.matchesPlayed = matchesPlayed;
         this.wins = wins;
         this.losses = losses;
@@ -83,9 +81,6 @@ public class Player {
 
     public String getNickname() { return nickname; }
     public void setNickname(String nickname) { this.nickname = nickname; }
-
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
 
     public int getMatchesPlayed() { return matchesPlayed; }
     public void setMatchesPlayed(int matchesPlayed) { this.matchesPlayed = matchesPlayed; }
@@ -118,10 +113,4 @@ public class Player {
     }
 
     public String getPlayerType() { return "GENERIC"; }
-
-    public void registerResult(boolean isWinner) {
-        matchesPlayed++;
-        if (isWinner) wins++;
-        else losses++;
-    }
 }

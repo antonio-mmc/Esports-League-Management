@@ -18,7 +18,8 @@ public class Team {
     private String name;
 
     private String nationality;
-    private String game;
+    private String game;         // modality: FPS, MOBA, EFOOTBALL, RACING, BATTLE_ROYALE
+    private String specificGame; // title within the modality, e.g. Valorant, CS2, League of Legends
     private Integer foundedYear;
     private String city;
 
@@ -33,7 +34,9 @@ public class Team {
     @Column(name = "coach_entry")
     private List<String> coachHistory = new ArrayList<>();
 
-    @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    // No REMOVE cascade: deleting a team releases its players to free agency
+    // (handled in TeamService.delete) rather than deleting them.
+    @OneToMany(mappedBy = "team", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
     @JsonIgnoreProperties("team")
     private List<Player> players = new ArrayList<>();
 
@@ -63,6 +66,9 @@ public class Team {
 
     public String getGame() { return game; }
     public void setGame(String game) { this.game = game; }
+
+    public String getSpecificGame() { return specificGame; }
+    public void setSpecificGame(String specificGame) { this.specificGame = specificGame; }
 
     public int getTrophies() { return trophies; }
     public void setTrophies(int trophies) { this.trophies = trophies; }

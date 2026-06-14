@@ -16,11 +16,11 @@ public class EFootballPlayer extends Player {
 
     public EFootballPlayer() {}
 
-    public EFootballPlayer(String fullName, String nickname, String password,
+    public EFootballPlayer(String fullName, String nickname,
                            int matchesPlayed, int wins, int losses,
                            String mainPosition, int goalsScored, int goalsSaved, int assists,
                            int shotsOnTarget, int ballRecoveries) {
-        super(fullName, nickname, password, matchesPlayed, wins, losses);
+        super(fullName, nickname, matchesPlayed, wins, losses);
         this.mainPosition = mainPosition;
         this.goalsScored = goalsScored;
         this.goalsSaved = goalsSaved;

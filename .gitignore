@@ -54,3 +54,6 @@ bin/
 # Node / Frontend
 frontend/node_modules/
 frontend/dist/
+
+# Personal project notes (local only, not for GitHub)
+NOTAS_PROJETO.md

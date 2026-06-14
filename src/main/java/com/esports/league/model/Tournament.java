@@ -33,6 +33,10 @@ public class Tournament {
     private String prizeSecond;
     private String prizeThird;
 
+    // Set when the tournament is marked COMPLETED: the standings winner, awarded a trophy.
+    private Long championTeamId;
+    private String championTeamName;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "tournament_teams",
@@ -86,6 +90,12 @@ public class Tournament {
 
     public String getPrizeThird() { return prizeThird; }
     public void setPrizeThird(String prizeThird) { this.prizeThird = prizeThird; }
+
+    public Long getChampionTeamId() { return championTeamId; }
+    public void setChampionTeamId(Long championTeamId) { this.championTeamId = championTeamId; }
+
+    public String getChampionTeamName() { return championTeamName; }
+    public void setChampionTeamName(String championTeamName) { this.championTeamName = championTeamName; }
 
     public List<Team> getParticipatingTeams() { return participatingTeams; }
     public void setParticipatingTeams(List<Team> participatingTeams) { this.participatingTeams = participatingTeams; }

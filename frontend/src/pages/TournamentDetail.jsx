@@ -4,8 +4,8 @@ import { ArrowLeft, Trophy, Shield, Swords, GitBranch, Users, Calendar } from 'l
 import Badge from '../components/Badge'
 import { tournamentApi } from '../services/api'
 import { winRate } from '../utils/stats'
-
-const STATUS_COLOR = { ACTIVE: 'green', FINISHED: 'gray', COMPLETED: 'gray', PENDING: 'cyan', UPCOMING: 'cyan' }
+import { STATUS_COLOR } from '../utils/gameMeta'
+import { useT } from '../context/LanguageContext'
 
 const FORMAT_LABEL = {
   SINGLE_ELIMINATION: 'Single Elimination',
@@ -27,7 +27,7 @@ function BracketCard({ match, accent = '#8B5CF6' }) {
   if (!match) {
     return (
       <div className="rounded-xl border border-bg-border/40 overflow-hidden min-w-[180px]"
-        style={{ background: 'rgba(15,23,42,0.6)' }}>
+        style={{ background: 'rgb(var(--bg-primary))' }}>
         <div className="px-3 py-2.5 border-b border-bg-border/30">
           <span className="font-body text-xs text-text-dim italic">TBD</span>
         </div>
@@ -44,7 +44,7 @@ function BracketCard({ match, accent = '#8B5CF6' }) {
 
   return (
     <div className="rounded-xl border overflow-hidden min-w-[200px]"
-      style={{ background: 'rgba(15,23,42,0.8)', borderColor: played ? `${accent}30` : 'rgba(51,65,85,0.6)' }}>
+      style={{ background: 'rgb(var(--bg-elevated))', borderColor: played ? `${accent}30` : 'rgb(var(--bg-border))' }}>
       {/* Team A */}
       <div className={`flex items-center justify-between px-3 py-2 border-b ${winnerA ? '' : 'border-bg-border/30'}`}
         style={{ borderColor: winnerA ? `${accent}20` : undefined, background: winnerA ? `${accent}12` : undefined }}>
@@ -73,7 +73,7 @@ function BracketCard({ match, accent = '#8B5CF6' }) {
       </div>
       {/* Date footer */}
       <div className="px-3 py-1.5 border-t border-bg-border/20 flex items-center justify-between"
-        style={{ background: 'rgba(0,0,0,0.2)' }}>
+        style={{ background: 'rgb(var(--bg-primary))' }}>
         <span className="font-body text-[10px] text-text-dim">{fmtDate(match.date)}</span>
         {!played && <Badge variant="gray">Pending</Badge>}
       </div>
@@ -108,6 +108,16 @@ function RoundArrow({ accent }) {
   )
 }
 
+// Names a knockout round from how many matches it holds (16 teams → "Round of 16").
+function roundLabel(matchesInRound) {
+  switch (matchesInRound) {
+    case 1:  return 'Grand Final'
+    case 2:  return 'Semi-Final'
+    case 4:  return 'Quarter-Final'
+    default: return `Round of ${matchesInRound * 2}`
+  }
+}
+
 // ── Single / Double Elimination bracket ───────────────────────────────────────
 
 function EliminationBracket({ matches, format, accent = '#8B5CF6' }) {
@@ -133,6 +143,19 @@ function EliminationBracket({ matches, format, accent = '#8B5CF6' }) {
     // SINGLE_ELIMINATION
     if (n <= 0) return []
     if (n === 1) return [{ label: 'Grand Final', matches: sorted }]
+
+    // Proper power-of-two knockout (n = 2^k - 1): split into halving rounds so a
+    // 16-team bracket reads Round of 16 → Quarter-Final → Semi-Final → Grand Final.
+    if (n >= 7 && Number.isInteger(Math.log2(n + 1))) {
+      const out = []
+      let idx = 0
+      for (let size = (n + 1) / 2; size >= 1; size = Math.floor(size / 2)) {
+        out.push({ label: roundLabel(size), matches: sorted.slice(idx, idx + size) })
+        idx += size
+      }
+      return out
+    }
+
     if (n === 2) return [
       { label: 'Semi-Final',  matches: [sorted[0]] },
       { label: 'Grand Final', matches: [sorted[1]] },
@@ -213,7 +236,7 @@ function GroupStageView({ matches, teams, accent = '#8B5CF6' }) {
                   style={{ background: `${accent}18`, border: `1px solid ${accent}28` }}>
                   <Shield size={13} style={{ color: accent }} />
                 </div>
-                <span className="font-body text-sm font-semibold text-text-primary flex-1 group-hover:text-white transition-colors truncate">{s.team.name}</span>
+                <span className="font-body text-sm font-semibold text-text-primary flex-1 group-hover:text-accent-green transition-colors truncate">{s.team.name}</span>
                 <div className="flex items-center gap-3 flex-shrink-0 font-body text-xs">
                   <span className="text-text-dim w-5 text-center">{s.played}</span>
                   <span className="text-accent-green font-semibold w-4 text-center">{s.wins}</span>
@@ -283,17 +306,20 @@ function LeagueStandings({ teams, matches, accent = '#06B6D4' }) {
   const standings = useMemo(() => {
     const played = matches.filter(m => m.resultRecorded)
     return [...teams].map(t => {
-      let w = 0, l = 0
+      let w = 0, l = 0, diff = 0
       played.forEach(m => {
         const isA = m.teamA?.id === t.id, isB = m.teamB?.id === t.id
         if (!isA && !isB) return
         const myScore  = isA ? m.teamAScore : m.teamBScore
         const oppScore = isA ? m.teamBScore : m.teamAScore
+        diff += myScore - oppScore
         if (myScore > oppScore) w++; else if (oppScore > myScore) l++
       })
-      return { team: t, played: w + l, wins: w, losses: l, pts: w * 3 }
-    }).sort((a, b) => b.pts - a.pts || b.wins - a.wins)
+      return { team: t, played: w + l, wins: w, losses: l, pts: w * 3, diff }
+    }).sort((a, b) => b.pts - a.pts || b.wins - a.wins || b.diff - a.diff)
   }, [teams, matches])
+
+  const fmtDiff = (d) => (d > 0 ? `+${d}` : `${d}`)
 
   return (
     <div className="space-y-1.5">
@@ -309,12 +335,13 @@ function LeagueStandings({ teams, matches, accent = '#06B6D4' }) {
               style={{ background: `${accent}18`, border: `1px solid ${accent}28` }}>
               <Shield size={14} style={{ color: accent }} />
             </div>
-            <span className="font-body font-semibold text-sm text-text-primary flex-1 group-hover:text-white transition-colors truncate">{s.team.name}</span>
+            <span className="font-body font-semibold text-sm text-text-primary flex-1 group-hover:text-accent-green transition-colors truncate">{s.team.name}</span>
             <div className="flex items-center gap-4 flex-shrink-0">
               <div className="flex gap-3 font-body text-xs">
                 <span className="text-accent-green font-semibold">{s.wins}W</span>
                 <span className="text-red-400">{s.losses}L</span>
               </div>
+              <span className="font-body text-xs text-text-dim w-9 text-right tabular" title="Score difference">{fmtDiff(s.diff)}</span>
               <Badge variant="green">{s.pts} pts</Badge>
               <span className="font-body text-xs text-text-dim w-10 text-right">{wr}%</span>
             </div>
@@ -335,6 +362,7 @@ function MatchListPanel({ matches }) {
     [...matches].sort((a, b) => new Date(a.date) - new Date(b.date)), [matches])
 
   const closestIdx = useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity -- intentionally relative to the current time
     const now = Date.now()
     let best = 0, bestDiff = Infinity
     sorted.forEach((m, i) => {
@@ -405,6 +433,7 @@ function StatPill({ label, value, accent }) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function TournamentDetail() {
+  const { t } = useT()
   const { id } = useParams()
   const [tournament, setTournament] = useState(null)
   const [loading,    setLoad]       = useState(true)
@@ -427,7 +456,7 @@ export default function TournamentDetail() {
   if (!tournament) {
     return (
       <div className="text-center py-32">
-        <p className="font-body text-text-muted">Tournament not found.</p>
+        <p className="font-body text-text-muted">{t('dt.tournamentNotFound')}</p>
         <Link to="/tournaments" className="btn-ghost mt-4 inline-flex">Back</Link>
       </div>
     )
@@ -447,7 +476,7 @@ export default function TournamentDetail() {
     <div className="animate-fade-in">
       <Link to="/tournaments" className="inline-flex items-center gap-2 text-text-muted hover:text-text-primary font-body text-sm mb-6 transition-colors cursor-pointer group">
         <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
-        Back to Tournaments
+        {t('common.back', { target: t('nav.tournaments') })}
       </Link>
 
       {/* Hero */}
@@ -466,7 +495,7 @@ export default function TournamentDetail() {
               </div>
               <p className="font-body text-sm text-text-muted mt-0.5">
                 {tournament.specificGame || tournament.game}
-                {' · '}{teams.length} teams · {matches.length} matches
+                {' · '}{teams.length} {t('common.teams')} · {matches.length} {t('common.matches')}
               </p>
               {(tournament.startDate || tournament.endDate) && (
                 <div className="flex items-center gap-1.5 mt-1.5">
@@ -480,19 +509,35 @@ export default function TournamentDetail() {
             </div>
           </div>
           <div className="flex gap-3">
-            <StatPill label="Teams"    value={teams.length}   accent={accent} />
-            <StatPill label="Matches"  value={matches.length} accent="#06B6D4" />
-            <StatPill label="Finished" value={completedCount} accent="#22C55E" />
+            <StatPill label={t('nav.teams')}    value={teams.length}   accent={accent} />
+            <StatPill label={t('players.matches')}  value={matches.length} accent="#06B6D4" />
+            <StatPill label={t('tour.finished')} value={completedCount} accent="#22C55E" />
           </div>
         </div>
       </div>
+
+      {/* Champion — set when the tournament is completed */}
+      {tournament.status === 'COMPLETED' && tournament.championTeamName && (
+        <Link to={tournament.championTeamId ? `/teams/${tournament.championTeamId}` : '#'}
+          className="glass-card p-5 mb-6 flex items-center gap-4 group cursor-pointer transition-all duration-150 hover:border-yellow-500/40"
+          style={{ background: 'linear-gradient(90deg, rgba(234,179,8,0.10), transparent)', borderColor: 'rgba(234,179,8,0.30)' }}>
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.35)' }}>
+            <Trophy size={22} className="text-yellow-400" />
+          </div>
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-yellow-500/80">Champion</p>
+            <p className="font-display text-xl text-text-primary group-hover:text-yellow-400 transition-colors">{tournament.championTeamName}</p>
+          </div>
+        </Link>
+      )}
 
       {/* Prizes */}
       {(tournament.prizeFirst || tournament.prizeSecond || tournament.prizeThird) && (
         <div className="glass-card p-5 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Trophy size={14} style={{ color: accent }} />
-            <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Prize Pool</h2>
+            <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">{t('tour.prizePool')}</h2>
           </div>
           <div className="flex gap-3">
             {tournament.prizeFirst && (
@@ -526,7 +571,7 @@ export default function TournamentDetail() {
           <div className="lg:col-span-2 glass-card p-5">
             <div className="flex items-center gap-2 mb-5">
               <Shield size={15} style={{ color: accent }} />
-              <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Standings</h2>
+              <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">{t('tour.standings')}</h2>
               <span className="font-body text-xs text-text-dim ml-1">({teams.length})</span>
             </div>
             {teams.length === 0
@@ -551,7 +596,7 @@ export default function TournamentDetail() {
           <div className="glass-card p-6">
             <div className="flex items-center gap-2 mb-6">
               <GitBranch size={15} style={{ color: accent }} />
-              <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Bracket</h2>
+              <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">{t('tour.bracket')}</h2>
               <Badge variant="amber">{FORMAT_LABEL[format]}</Badge>
             </div>
             <EliminationBracket matches={matches} format={format} accent={accent} />
@@ -561,7 +606,7 @@ export default function TournamentDetail() {
           <div className="glass-card p-5">
             <div className="flex items-center gap-2 mb-4">
               <Shield size={15} style={{ color: accent }} />
-              <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Participants</h2>
+              <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">{t('tour.participants')}</h2>
               <span className="font-body text-xs text-text-dim ml-1">({teams.length})</span>
             </div>
             <div className="flex flex-wrap gap-2">

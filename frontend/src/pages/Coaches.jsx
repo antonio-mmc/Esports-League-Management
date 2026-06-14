@@ -1,7 +1,8 @@
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { Plus, UserCheck, Crosshair, Sword, Footprints, Car, Skull, Trash2, Edit2, Search, X, ChevronRight, ChevronDown } from 'lucide-react'
 import { useSearchParams, Link, useNavigate } from 'react-router-dom'
 import { useGameFilter } from '../context/GameFilterContext'
+import { useT } from '../context/LanguageContext'
 import PageHeader from '../components/PageHeader'
 import DataTable from '../components/DataTable'
 import Modal from '../components/Modal'
@@ -19,21 +20,7 @@ const TYPE_META = {
   BATTLE_ROYALE:{ label: 'Battle Royale',color: 'red',    icon: Skull,      hex: '#EF4444' },
 }
 
-const COUNTRY_CODE = {
-  'Portugal': 'PT', 'Spain': 'ES', 'Japan': 'JP', 'Russia': 'RU',
-  'Ghana': 'GH', 'Denmark': 'DK', 'Sweden': 'SE', 'Italy': 'IT',
-  'Egypt': 'EG', 'France': 'FR', 'Brazil': 'BR', 'Germany': 'DE',
-  'South Korea': 'KR', 'Czech Republic': 'CZ', 'Senegal': 'SN',
-  'Ireland': 'IE', 'Croatia': 'HR', 'Lebanon': 'LB', 'Colombia': 'CO',
-  'Norway': 'NO', 'Pakistan': 'PK', 'USA': 'US', 'United Kingdom': 'GB',
-  'Mexico': 'MX', 'Morocco': 'MA', 'Netherlands': 'NL', 'Argentina': 'AR',
-  'India': 'IN', 'Nigeria': 'NG', 'Ukraine': 'UA', 'China': 'CN',
-  'Bangladesh': 'BD',
-}
-
-const flagEmoji = code => code
-  ? code.toUpperCase().split('').map(c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)).join('')
-  : ''
+import { COUNTRY_CODE, flagEmoji } from '../utils/countries'
 
 function FlagIcon({ nationality, size = 16 }) {
   const code = COUNTRY_CODE[nationality]
@@ -42,6 +29,7 @@ function FlagIcon({ nationality, size = 16 }) {
 }
 
 function AgeFilter({ ageMin, ageMax, onChange }) {
+  const { t } = useT()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -54,7 +42,7 @@ function AgeFilter({ ageMin, ageMax, onChange }) {
   const hasFilter = ageMin || ageMax
   const displayLabel = hasFilter
     ? (ageMin && ageMax ? `${ageMin} – ${ageMax}` : ageMin ? `${ageMin}+` : `≤ ${ageMax}`)
-    : 'All Ages'
+    : t('players.allAges')
 
   const clear = () => { onChange('', ''); setOpen(false) }
 
@@ -70,18 +58,18 @@ function AgeFilter({ ageMin, ageMax, onChange }) {
         }
       </div>
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 rounded-xl border border-bg-border p-3"
-          style={{ background: 'rgba(9,15,29,0.98)', backdropFilter: 'blur(20px)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', width: 192 }}>
-          <p className="font-body text-xs text-text-dim uppercase tracking-wider mb-2.5">Age range</p>
+        <div className="absolute top-full left-0 mt-1 z-50 rounded border border-bg-border p-3"
+          style={{ background: 'rgb(var(--bg-elevated))', boxShadow: '0 12px 40px rgba(0,0,0,0.35)', width: 192 }}>
+          <p className="eyebrow mb-2.5">{t('players.ageRange')}</p>
           <div className="flex items-center gap-2">
             <input type="number" min="0" max="99" value={ageMin}
               onChange={e => onChange(e.target.value, ageMax)}
-              placeholder="Min"
+              placeholder={t('players.min')}
               className="input-field text-center px-2" style={{ width: 72 }} />
             <span className="font-body text-text-dim text-sm flex-shrink-0">–</span>
             <input type="number" min="0" max="99" value={ageMax}
               onChange={e => onChange(ageMin, e.target.value)}
-              placeholder="Max"
+              placeholder={t('players.max')}
               className="input-field text-center px-2" style={{ width: 72 }} />
           </div>
         </div>
@@ -116,6 +104,7 @@ function Field({ label, children }) {
 }
 
 export default function Coaches() {
+  const { t } = useT()
   const [coaches, setCoaches] = useState([])
   const [teams, setTeams]     = useState([])
   const [loading, setLoading] = useState(true)
@@ -125,7 +114,7 @@ export default function Coaches() {
   const [saving, setSaving]   = useState(false)
   const navigate = useNavigate()
   const { gameFilter } = useGameFilter()
-  const [filter,            setFilter]           = useState('ALL')
+  const [filter,            setFilter]           = useState(gameFilter)
   const [teamFilter,        setTeamFilter]        = useState('')
   const [nationalityFilter, setNationalityFilter] = useState('')
   const [ageMin,            setAgeMin]            = useState('')
@@ -147,7 +136,12 @@ export default function Coaches() {
     }
   }
 
-  useEffect(() => { setFilter(gameFilter) }, [gameFilter])
+  // Follow the global modality filter when it changes (adjust during render).
+  const [prevGameFilter, setPrevGameFilter] = useState(gameFilter)
+  if (gameFilter !== prevGameFilter) {
+    setPrevGameFilter(gameFilter)
+    setFilter(gameFilter)
+  }
 
   const searchHighlight = searchParams.get('q') || ''
 
@@ -159,6 +153,8 @@ export default function Coaches() {
       setTeams(tRes.data || [])
     } finally { setLoading(false) }
   }
+  // Intentional one-time fetch on mount; the loading flag set inside load() is expected.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load() }, [])
 
   const openCreate = () => { setEditing(null); setForm(emptyForm); setModal(true) }
@@ -191,24 +187,24 @@ export default function Coaches() {
       if (editing) await coachApi.update(editing.id, payload)
       else         await coachApi.create(payload)
       setModal(false)
-      toast(editing ? 'Coach updated.' : 'Coach created successfully.', 'success')
+      toast(editing ? t('coaches.updated') : t('coaches.created'), 'success')
       load()
-    } catch(e) { toast(e?.response?.data?.message || 'Failed to save.', 'error') }
+    } catch(e) { toast(e?.response?.data?.error || e?.response?.data?.message || t('coaches.saveFail'), 'error') }
     finally { setSaving(false) }
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete coach?')) return
+    if (!confirm(t('coaches.confirmDelete'))) return
     try {
       await coachApi.delete(id)
-      toast('Coach deleted.', 'info')
+      toast(t('coaches.deleted'), 'info')
       load()
-    } catch(e) { toast(e?.response?.data?.message || 'Failed to delete.', 'error') }
+    } catch(e) { toast(e?.response?.data?.error || e?.response?.data?.message || t('coaches.deleteFail'), 'error') }
   }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const getDominantType = (coach) => {
+  const getDominantType = useCallback((coach) => {
     if (coach.specialization) return coach.specialization
     // fallback: derive from team players if available
     const team = teams.find(t => t.id === coach.team?.id)
@@ -218,10 +214,10 @@ export default function Coaches() {
       if (p.playerType) counts[p.playerType] = (counts[p.playerType] || 0) + 1
     })
     return Object.entries(counts).sort(([, a], [, b]) => b - a)[0]?.[0] ?? null
-  }
+  }, [teams])
 
   const modeOptions = [
-    { value: 'ALL',          label: 'All Games'    },
+    { value: 'ALL',          label: t('common.allGames') },
     { value: 'FPS',          label: 'FPS'          },
     { value: 'MOBA',         label: 'MOBA'         },
     { value: 'EFOOTBALL',    label: 'eFootball'    },
@@ -230,16 +226,16 @@ export default function Coaches() {
   ]
 
   const teamOptions = useMemo(() => [
-    { value: '',     label: 'All Teams'   },
-    { value: 'FREE', label: 'Free Agents' },
-    ...teams.map(t => ({ value: String(t.id), label: `${teamEmoji(t.name)} ${t.name}` })),
-  ], [teams])
+    { value: '',     label: t('common.allTeams') },
+    { value: 'FREE', label: t('players.freeAgents') },
+    ...teams.map(tm => ({ value: String(tm.id), label: `${teamEmoji(tm.name)} ${tm.name}` })),
+  ], [teams, t])
 
   const nationalityOptions = useMemo(() => {
     const nations = [...new Set(coaches.map(c => c.nationality).filter(Boolean))].sort()
     return [
-      { value: '', label: 'All Nations' },
-      ...nations.map(n => ({ value: n, label: `${flagEmoji(COUNTRY_CODE[n])} ${n}`.trim() })),
+      { value: '', label: t('common.allNations') },
+      ...nations.map(n => ({ value: n, label: `${flagEmoji(n)} ${n}`.trim() })),
     ]
   }, [coaches])
 
@@ -283,7 +279,7 @@ export default function Coaches() {
       return [...result.filter(isMatch), ...result.filter(c => !isMatch(c))]
     }
     return result
-  }, [coaches, filter, teamFilter, nationalityFilter, ageMin, ageMax, nameSearch, searchHighlight, sortKey, sortDir, teams])
+  }, [coaches, filter, teamFilter, nationalityFilter, ageMin, ageMax, nameSearch, searchHighlight, sortKey, sortDir, getDominantType])
 
   const highlightFn = searchHighlight
     ? (row) => {
@@ -326,12 +322,12 @@ export default function Coaches() {
       const m = TYPE_META[mode] || {}
       return mode ? <Badge variant={m.color || 'gray'}>{m.label || mode}</Badge> : <span className="text-text-dim">—</span>
     }},
-    { key: 'team', label: 'Team', sortable: true, render: (v) => v?.name
+    { key: 'team', label: t('col.team'), sortable: true, render: (v) => v?.name
       ? <span className="flex items-center gap-1.5"><span>{teamEmoji(v.name)}</span>{v.name}</span>
-      : <span className="text-sm font-semibold px-2 py-0.5 rounded-full font-body bg-bg-border/40 text-text-muted border border-bg-border">Free</span>
+      : <span className="text-sm font-semibold px-2 py-0.5 rounded-full font-body bg-bg-border/40 text-text-muted border border-bg-border">{t('players.free')}</span>
     },
     { key: '_actions', label: '', render: (_, r) => (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
         <button onClick={() => navigate(`/coaches/${r.id}`)} className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-primary transition-all duration-150 cursor-pointer">
           <ChevronRight size={13} />
         </button>
@@ -348,25 +344,25 @@ export default function Coaches() {
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title="Coaches"
-        subtitle={`${coaches.length} registered coaches`}
+        title={t('nav.coaches')}
+        subtitle={t('page.coachesSub', { n: coaches.length })}
         action={
           <button onClick={openCreate} className="btn-primary">
-            <Plus size={15} /> New Coach
+            <Plus size={15} /> {t('page.newCoach')}
           </button>
         }
       />
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-5">
-        <Combobox value={filter}            onChange={setFilter}            options={modeOptions}        placeholder="All Games"   style={{ width: 160 }} />
-        <Combobox value={teamFilter}        onChange={setTeamFilter}        options={teamOptions}        placeholder="All Teams"   style={{ width: 160 }} />
-        <Combobox value={nationalityFilter} onChange={setNationalityFilter} options={nationalityOptions} placeholder="All Nations" style={{ width: 160 }} />
+        <Combobox value={filter}            onChange={setFilter}            options={modeOptions}        placeholder={t('common.allGames')}   style={{ width: 160 }} />
+        <Combobox value={teamFilter}        onChange={setTeamFilter}        options={teamOptions}        placeholder={t('common.allTeams')}   style={{ width: 160 }} />
+        <Combobox value={nationalityFilter} onChange={setNationalityFilter} options={nationalityOptions} placeholder={t('common.allNations')} style={{ width: 160 }} />
         <AgeFilter ageMin={ageMin} ageMax={ageMax} onChange={(min, max) => { setAgeMin(min); setAgeMax(max) }} />
         <div className="flex items-center gap-2 flex-1 min-w-48 px-3 py-2 rounded-lg bg-bg-primary border border-bg-border focus-within:border-accent-green/40 transition-colors duration-150">
           <Search size={13} className="text-text-dim flex-shrink-0" />
           <input value={nameSearch} onChange={e => setNameSearch(e.target.value)}
-            placeholder="Search coach..."
+            placeholder={t('teams.searchCoach')}
             className="bg-transparent font-body text-sm text-text-primary placeholder:text-text-dim outline-none flex-1 min-w-0" />
           {nameSearch && (
             <button onMouseDown={e => { e.preventDefault(); setNameSearch('') }} className="text-text-dim hover:text-text-muted transition-colors cursor-pointer">
@@ -376,44 +372,44 @@ export default function Coaches() {
         </div>
       </div>
 
-      <DataTable columns={columns} data={filtered} loading={loading} emptyMessage="No coaches found." highlightFn={highlightFn} sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+      <DataTable columns={columns} data={filtered} loading={loading} emptyMessage={t('coaches.none')} highlightFn={highlightFn} sortKey={sortKey} sortDir={sortDir} onSort={handleSort} onRowClick={(r) => navigate(`/coaches/${r.id}`)} />
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Coach' : 'New Coach'} width="max-w-xl">
+      <Modal open={modal} onClose={() => setModal(false)} title={editing ? t('coaches.edit') : t('coaches.new')} width="max-w-xl">
         <div className="space-y-3">
           {/* Identity */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Name">
+            <Field label={t('col.name')}>
               <input className="input-field" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Alex Johnson" />
             </Field>
-            <Field label="Email">
+            <Field label={t('col.email')}>
               <input type="email" className="input-field" value={form.email} onChange={e => set('email', e.target.value)} placeholder="coach@esports.com" />
             </Field>
           </div>
 
           {/* Profile */}
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Nationality">
+            <Field label={t('col.nation')}>
               <input className="input-field" value={form.nationality} onChange={e => set('nationality', e.target.value)} placeholder="Portugal" />
             </Field>
-            <Field label="City">
+            <Field label={t('col.city')}>
               <input className="input-field" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Lisbon" />
             </Field>
-            <Field label="Date of Birth">
+            <Field label={t('players.dob')}>
               <input type="date" className="input-field" value={form.birthDate} onChange={e => set('birthDate', e.target.value)} />
             </Field>
           </div>
 
           {/* Team + Mode */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Team">
+            <Field label={t('col.team')}>
               <select className="input-field" value={form.teamId} onChange={e => set('teamId', e.target.value)}>
-                <option value="">No team</option>
-                {teams.map(t => <option key={t.id} value={t.id}>{teamEmoji(t.name)} {t.name}</option>)}
+                <option value="">{t('players.noTeamShort')}</option>
+                {teams.map(tm => <option key={tm.id} value={tm.id}>{teamEmoji(tm.name)} {tm.name}</option>)}
               </select>
             </Field>
-            <Field label="Mode">
+            <Field label={t('col.mode')}>
               <select className="input-field" value={form.specialization} onChange={e => set('specialization', e.target.value)}>
-                <option value="">None</option>
+                <option value="">{t('ui.none')}</option>
                 <option value="FPS">FPS</option>
                 <option value="MOBA">MOBA</option>
                 <option value="EFOOTBALL">eFootball</option>
@@ -423,7 +419,7 @@ export default function Coaches() {
             </Field>
           </div>
 
-          <Field label="Achievements (one per line)">
+          <Field label={t('players.achievements')}>
             <textarea className="input-field resize-none" rows={3}
               placeholder={"FPS Coach of the Year 2025\nLed Team to 2nd place — Valorant Cup"}
               value={form.achievementsText}
@@ -431,9 +427,9 @@ export default function Coaches() {
           </Field>
 
           <div className="flex gap-3 justify-end pt-1">
-            <button onClick={() => setModal(false)} className="btn-ghost">Cancel</button>
+            <button onClick={() => setModal(false)} className="btn-ghost">{t('common.cancel')}</button>
             <button onClick={handleSave} disabled={saving} className="btn-primary">
-              {saving ? 'Saving...' : editing ? 'Save' : 'Create'}
+              {saving ? t('common.saving') : editing ? t('common.save') : t('common.create')}
             </button>
           </div>
         </div>

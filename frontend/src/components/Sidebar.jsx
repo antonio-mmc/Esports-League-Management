@@ -2,19 +2,23 @@ import { useState, useEffect, useRef } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import {
-  LayoutDashboard, Users, UserCheck, Shield, Trophy, Swords, ChevronRight, Search, X
+  LayoutDashboard, Users, UserCheck, Shield, Trophy, Swords, ChevronRight, Search, X,
+  Sun, Moon, Monitor, ArrowLeftRight
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { GAME_FILTERS, useGameFilter } from '../context/GameFilterContext'
+import { useTheme } from '../context/ThemeContext'
+import { useT } from '../context/LanguageContext'
 import { playerApi, teamApi, coachApi, tournamentApi } from '../services/api'
 
 const nav = [
-  { to: '/',            icon: LayoutDashboard, label: 'Dashboard'   },
-  { to: '/players',     icon: Users,           label: 'Players'     },
-  { to: '/coaches',     icon: UserCheck,       label: 'Coaches'     },
-  { to: '/teams',       icon: Shield,          label: 'Teams'       },
-  { to: '/tournaments', icon: Trophy,          label: 'Tournaments' },
-  { to: '/matches',     icon: Swords,          label: 'Matches'     },
+  { to: '/',            icon: LayoutDashboard, key: 'dashboard'   },
+  { to: '/players',     icon: Users,           key: 'players'     },
+  { to: '/coaches',     icon: UserCheck,       key: 'coaches'     },
+  { to: '/teams',       icon: Shield,          key: 'teams'       },
+  { to: '/tournaments', icon: Trophy,          key: 'tournaments' },
+  { to: '/matches',     icon: Swords,          key: 'matches'     },
+  { to: '/transfers',   icon: ArrowLeftRight,  key: 'transfers'   },
 ]
 
 const labelVariants = {
@@ -40,6 +44,7 @@ function SearchSection({ label, items, getLabel, getSub, onSelect }) {
 }
 
 function SidebarSearch() {
+  const { t } = useT()
   const [query,   setQuery]   = useState('')
   const [open,    setOpen]    = useState(false)
   const [dropPos, setDropPos] = useState({ top: 0, left: 0 })
@@ -103,7 +108,7 @@ function SidebarSearch() {
           value={query}
           onChange={e => setQuery(e.target.value)}
           onFocus={handleFocus}
-          placeholder="Search..."
+          placeholder={t('common.search')}
           className="bg-transparent font-body text-xs text-text-primary placeholder:text-text-dim outline-none flex-1 min-w-0"
         />
         {query && (
@@ -128,35 +133,33 @@ function SidebarSearch() {
                 left:     dropPos.left,
                 width:    284,
                 zIndex:   9999,
-                background: 'rgba(9,15,29,0.98)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                border: '1px solid rgba(30,41,59,0.8)',
-                borderRadius: 12,
-                boxShadow: '0 20px 48px rgba(0,0,0,0.6)',
+                background: 'rgb(var(--bg-elevated))',
+                border: '1px solid rgb(var(--bg-border))',
+                borderRadius: 4,
+                boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
               }}>
               <div className="py-1 max-h-72 overflow-y-auto">
                 {!hasResults ? (
-                  <p className="font-body text-xs text-text-dim text-center py-5">No results for "{query}"</p>
+                  <p className="font-body text-xs text-text-dim text-center py-5">{t('mt.noResultsFor', { q: query })}</p>
                 ) : (
                   <>
                     {results.players.length > 0 && (
-                      <SearchSection label="Players" items={results.players}
+                      <SearchSection label={t('nav.players')} items={results.players}
                         getLabel={p => p.nickname} getSub={p => p.fullName || p.playerType}
                         onSelect={p => go(`/players?q=${encodeURIComponent(p.nickname || '')}`)} />
                     )}
                     {results.teams.length > 0 && (
-                      <SearchSection label="Teams" items={results.teams}
-                        getLabel={t => t.name} getSub={t => `${t.players?.length ?? 0} players`}
-                        onSelect={t => go(`/teams/${t.id}`)} />
+                      <SearchSection label={t('nav.teams')} items={results.teams}
+                        getLabel={tm => tm.name} getSub={tm => `${tm.players?.length ?? 0} ${t('common.players')}`}
+                        onSelect={tm => go(`/teams/${tm.id}`)} />
                     )}
                     {results.coaches.length > 0 && (
-                      <SearchSection label="Coaches" items={results.coaches}
-                        getLabel={c => c.name} getSub={c => c.team?.name || 'No team'}
+                      <SearchSection label={t('nav.coaches')} items={results.coaches}
+                        getLabel={c => c.name} getSub={c => c.team?.name || t('players.noTeamShort')}
                         onSelect={c => go(`/coaches?q=${encodeURIComponent(c.name || '')}`)} />
                     )}
                     {results.tournaments.length > 0 && (
-                      <SearchSection label="Tournaments" items={results.tournaments}
+                      <SearchSection label={t('nav.tournaments')} items={results.tournaments}
                         getLabel={t => t.name} getSub={t => t.game || '—'}
                         onSelect={t => go(`/tournaments/${t.id}`)} />
                     )}
@@ -175,6 +178,14 @@ function SidebarSearch() {
 export default function Sidebar({ collapsed, onToggle }) {
   const location = useLocation()
   const { gameFilter, setGameFilter } = useGameFilter()
+  const { t, lang, setLang } = useT()
+  const { theme, setTheme } = useTheme()
+
+  const themeOptions = [
+    { key: 'light',  icon: Sun,     label: t('theme.light')  },
+    { key: 'dark',   icon: Moon,    label: t('theme.dark')   },
+    { key: 'system', icon: Monitor, label: t('theme.system') },
+  ]
 
   return (
     <motion.aside
@@ -182,37 +193,36 @@ export default function Sidebar({ collapsed, onToggle }) {
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       className="fixed inset-y-0 left-0 flex flex-col z-40 overflow-hidden"
       style={{
-        background: 'rgba(9,15,29,0.97)',
-        borderRight: '1px solid rgba(30,41,59,0.8)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        background: 'rgb(var(--bg-sidebar))',
+        borderRight: '1px solid rgb(var(--bg-border))',
       }}>
 
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-bg-border flex-shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-accent-green flex items-center justify-center shadow-glow flex-shrink-0">
+        <div className="w-8 h-8 rounded-sm bg-accent-green flex items-center justify-center flex-shrink-0">
           <Swords size={16} className="text-bg-base" strokeWidth={2.5} />
         </div>
         <motion.div variants={labelVariants} animate={collapsed ? 'hidden' : 'visible'} className="overflow-hidden min-w-0">
-          <p className="font-display text-text-primary text-sm leading-tight whitespace-nowrap">ESports</p>
-          <p className="font-body text-text-dim text-xs leading-tight whitespace-nowrap">League Manager</p>
+          <p className="font-display font-extrabold text-text-primary text-sm leading-tight tracking-tight whitespace-nowrap">ESPORTS</p>
+          <p className="font-mono text-text-dim text-[10px] uppercase tracking-[0.18em] leading-tight whitespace-nowrap">{t('brand.subtitle')}</p>
         </motion.div>
       </div>
 
       {/* Scrollable body: nav + search/filter sit together, collapse stays pinned at bottom */}
       <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden min-h-0">
         <nav className="px-2 py-4 space-y-0.5">
-          {nav.map(({ to, icon: Icon, label }) => {
+          {nav.map(({ to, icon: Icon, key }) => {
+            const label = t(`nav.${key}`)
             const active = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
             return (
               <NavLink key={to} to={to} title={collapsed ? label : undefined}
                 className={[
-                  'group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-150 cursor-pointer',
+                  'group flex items-center gap-3 px-3 py-2.5 rounded-sm transition-colors duration-150 cursor-pointer',
                   active
-                    ? 'bg-accent-green/10 text-accent-green border border-accent-green/20'
-                    : 'text-text-muted hover:text-text-primary hover:bg-bg-primary border border-transparent',
+                    ? 'bg-bg-primary text-text-primary accent-tick'
+                    : 'text-text-muted hover:text-text-primary hover:bg-bg-primary/60',
                 ].join(' ')}>
-                <Icon size={16} strokeWidth={active ? 2.5 : 2} className="flex-shrink-0" />
+                <Icon size={16} strokeWidth={active ? 2.5 : 2} className={`flex-shrink-0 ${active ? 'text-accent-green' : ''}`} />
                 <motion.span variants={labelVariants} animate={collapsed ? 'hidden' : 'visible'}
                   className="font-body font-medium text-sm flex-1 whitespace-nowrap">
                   {label}
@@ -236,15 +246,15 @@ export default function Sidebar({ collapsed, onToggle }) {
           <div className="border-t border-bg-border px-3 pt-3 pb-3 space-y-3">
             <SidebarSearch />
             <div>
-              <p className="font-body text-xs text-text-dim uppercase tracking-wider mb-2 px-0.5">Mode</p>
+              <p className="eyebrow mb-2 px-0.5">{t('common.mode')}</p>
               <div className="grid grid-cols-2 gap-1">
                 {GAME_FILTERS.map(f => (
                   <button key={f.key} onClick={() => setGameFilter(f.key)}
                     className={[
-                      'py-1.5 px-2 rounded-lg font-body text-xs font-medium transition-all duration-150 cursor-pointer text-center',
+                      'py-1.5 px-2 rounded-sm font-mono text-[11px] font-medium uppercase tracking-wide transition-all duration-150 cursor-pointer text-center',
                       gameFilter === f.key
-                        ? 'bg-accent-green/15 text-accent-green border border-accent-green/25'
-                        : 'text-text-muted hover:text-text-primary hover:bg-bg-primary border border-transparent',
+                        ? 'bg-accent-green/12 text-accent-green border border-accent-green/30'
+                        : 'text-text-muted hover:text-text-primary hover:bg-bg-primary border border-bg-border',
                     ].join(' ')}>
                     {f.label}
                   </button>
@@ -255,16 +265,69 @@ export default function Sidebar({ collapsed, onToggle }) {
         </motion.div>
       </div>
 
+      {/* Theme + Language controls */}
+      <div className="flex-shrink-0 border-t border-bg-border">
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-1 py-2">
+            <button
+              onClick={() => setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light')}
+              title={t('theme.label')}
+              className="w-8 h-8 rounded-sm flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-primary transition-colors cursor-pointer">
+              {theme === 'light' ? <Sun size={15} /> : theme === 'dark' ? <Moon size={15} /> : <Monitor size={15} />}
+            </button>
+            <button onClick={() => setLang(lang === 'en' ? 'pt' : 'en')} title={t('lang.label')}
+              className="w-8 h-8 rounded-sm flex items-center justify-center font-mono text-[10px] font-semibold text-text-muted hover:text-text-primary hover:bg-bg-primary transition-colors cursor-pointer">
+              {lang.toUpperCase()}
+            </button>
+          </div>
+        ) : (
+          <div className="px-3 py-3 space-y-2.5">
+            <div>
+              <p className="eyebrow mb-1.5 px-0.5">{t('theme.label')}</p>
+              <div className="grid grid-cols-3 gap-1">
+                {themeOptions.map(({ key, icon: Icon, label }) => (
+                  <button key={key} onClick={() => setTheme(key)} title={label}
+                    className={[
+                      'flex items-center justify-center gap-1.5 py-1.5 rounded-sm font-mono text-[10px] font-medium uppercase tracking-wide transition-all duration-150 cursor-pointer',
+                      theme === key
+                        ? 'bg-accent-green/12 text-accent-green border border-accent-green/30'
+                        : 'text-text-muted hover:text-text-primary hover:bg-bg-primary border border-bg-border',
+                    ].join(' ')}>
+                    <Icon size={12} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="eyebrow mb-1.5 px-0.5">{t('lang.label')}</p>
+              <div className="grid grid-cols-2 gap-1">
+                {['en', 'pt'].map(l => (
+                  <button key={l} onClick={() => setLang(l)}
+                    className={[
+                      'py-1.5 rounded-sm font-mono text-[11px] font-medium uppercase tracking-wide transition-all duration-150 cursor-pointer',
+                      lang === l
+                        ? 'bg-accent-green/12 text-accent-green border border-accent-green/30'
+                        : 'text-text-muted hover:text-text-primary hover:bg-bg-primary border border-bg-border',
+                    ].join(' ')}>
+                    {l === 'en' ? 'EN' : 'PT'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Collapse toggle */}
       <div className="flex-shrink-0 border-t border-bg-border">
-        <button onClick={onToggle} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="w-full flex items-center gap-3 px-4 py-4 text-text-dim hover:text-text-primary hover:bg-bg-primary/50 transition-colors duration-150">
+        <button onClick={onToggle} title={collapsed ? t('common.expand') : t('common.collapse')}
+          className="w-full flex items-center gap-3 px-4 py-3.5 text-text-dim hover:text-text-primary hover:bg-bg-primary/50 transition-colors duration-150">
           <motion.div animate={{ rotate: collapsed ? 0 : 180 }} transition={{ type: 'spring', stiffness: 300, damping: 25 }} className="flex-shrink-0">
             <ChevronRight size={15} />
           </motion.div>
           <motion.span variants={labelVariants} animate={collapsed ? 'hidden' : 'visible'}
             className="font-body text-xs font-medium whitespace-nowrap">
-            Collapse
+            {t('common.collapse')}
           </motion.span>
         </button>
       </div>

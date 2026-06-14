@@ -9,10 +9,10 @@ const ICONS = {
   info:    <AlertCircle size={15} className="text-accent-cyan flex-shrink-0"  />,
 }
 
-const BORDERS = {
-  success: 'border-accent-green/30',
-  error:   'border-red-400/30',
-  info:    'border-accent-cyan/30',
+const TICK = {
+  success: '#22C55E',
+  error:   '#F87171',
+  info:    '#38BDF8',
 }
 
 export function ToastProvider({ children }) {
@@ -32,8 +32,8 @@ export function ToastProvider({ children }) {
       <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none" style={{ maxWidth: 340 }}>
         {toasts.map(toast => (
           <div key={toast.id}
-            className={`pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl border glass-card animate-slide-up ${BORDERS[toast.type]}`}
-            style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+            className="pointer-events-auto flex items-start gap-3 px-4 py-3 rounded border border-bg-border animate-slide-up"
+            style={{ background: 'rgb(var(--bg-elevated))', boxShadow: `inset 2px 0 0 ${TICK[toast.type]}, 0 12px 40px rgba(0,0,0,0.35)` }}>
             {ICONS[toast.type]}
             <p className="font-body text-sm text-text-primary flex-1 leading-snug">{toast.message}</p>
             <button onClick={() => remove(toast.id)}
@@ -47,4 +47,5 @@ export function ToastProvider({ children }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook colocated with its provider
 export const useToast = () => useContext(ToastContext)

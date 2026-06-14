@@ -50,12 +50,10 @@ export default function Combobox({ value, onChange, options = [], placeholder = 
 
       {open && filtered.length > 0 && (
         <div
-          className="absolute top-full left-0 right-0 mt-1 z-50 rounded-xl border border-bg-border py-1 max-h-52 overflow-y-auto"
+          className="absolute top-full left-0 right-0 mt-1 z-50 rounded border border-bg-border py-1 max-h-52 overflow-y-auto"
           style={{
-            background: 'rgba(9,15,29,0.98)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            background: 'rgb(var(--bg-elevated))',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
           }}>
           {filtered.map(opt => (
             <button

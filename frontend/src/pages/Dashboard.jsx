@@ -1,18 +1,37 @@
-import { useEffect, useState, useMemo } from 'react'
-import { Users, Shield, Trophy, Swords, CheckCircle2, Calendar, UserCheck } from 'lucide-react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import { Users, Shield, Trophy, Swords, CheckCircle2, Calendar, UserCheck, ArrowLeftRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import StatCard from '../components/StatCard'
 import PageHeader from '../components/PageHeader'
 import Badge from '../components/Badge'
 import Combobox from '../components/Combobox'
-import { GAME_FILTERS, useGameFilter } from '../context/GameFilterContext'
+import { useGameFilter } from '../context/GameFilterContext'
+import { useT } from '../context/LanguageContext'
 import { dashboardApi, tournamentApi, matchApi, teamApi, coachApi } from '../services/api'
 import { teamEmoji } from '../utils/teamEmoji'
-import { TYPE_COLOR, TYPE_LABEL, TYPE_BADGE, TYPE_EMOJI, matchesGameFilter as matchesGame } from '../utils/gameMeta'
+import { TYPE_COLOR, TYPE_LABEL, TYPE_BADGE, TYPE_EMOJI, STATUS_COLOR, matchesGameFilter as matchesGame } from '../utils/gameMeta'
 import { winRate } from '../utils/stats'
 
-const STATUS_COLOR = { ACTIVE: 'green', FINISHED: 'gray', PENDING: 'cyan', UPCOMING: 'cyan' }
+const MODE_ORDER = ['FPS', 'MOBA', 'EFOOTBALL', 'RACING', 'BATTLE_ROYALE']
+
+// Most-represented player type on a team (pure helper — kept at module scope so it
+// is a stable reference and doesn't need to be a hook dependency).
+const getDominantType = (team) => {
+  const counts = {}
+  ;(team.players || []).forEach(p => {
+    if (p.playerType) counts[p.playerType] = (counts[p.playerType] || 0) + 1
+  })
+  return Object.entries(counts).sort(([, a], [, b]) => b - a)[0]?.[0] ?? null
+}
+
+// Compact euro formatting for market values (e.g. €360K, €1.2M).
+const fmtValue = (v) => {
+  if (v == null) return ''
+  if (v >= 1_000_000) return `€${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`
+  if (v >= 1000)      return `€${Math.round(v / 1000)}K`
+  return `€${v}`
+}
 
 const fadeUp = {
   initial: { opacity: 0, y: 8 },
@@ -20,8 +39,19 @@ const fadeUp = {
   exit:    { opacity: 0, y: -4 },
 }
 
+const staggerGrid = {
+  hidden: {},
+  show:   { transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
+}
+
+const gridItem = {
+  hidden: { opacity: 0, y: 12 },
+  show:   { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 320, damping: 26 } },
+}
+
 export default function Dashboard() {
   const { gameFilter } = useGameFilter()
+  const { t } = useT()
   const [stats,       setStats]       = useState(null)
   const [topPlayers,  setTopPlayers]  = useState([])
   const [breakdown,   setBreakdown]   = useState({})
@@ -31,10 +61,12 @@ export default function Dashboard() {
   const [coaches,     setCoaches]     = useState([])
   const [loading,     setLoading]     = useState(true)
   const [gameDetail,  setGameDetail]  = useState('ALL')
+  const [freeAgents,  setFreeAgents]  = useState({ players: [], coaches: [] })
+  const [transfers,   setTransfers]   = useState([])
 
   useEffect(() => {
     const load = async () => {
-      const [sRes, pRes, bRes, tRes, mRes, teRes, cRes] = await Promise.allSettled([
+      const [sRes, pRes, bRes, tRes, mRes, teRes, cRes, faRes, trRes] = await Promise.allSettled([
         dashboardApi.getStats(),
         dashboardApi.getTopPlayers(),
         dashboardApi.getGameBreakdown(),
@@ -42,6 +74,8 @@ export default function Dashboard() {
         matchApi.getAll(),
         teamApi.getAll(),
         coachApi.getAll(),
+        dashboardApi.getFreeAgents(),
+        dashboardApi.getRecentTransfers(),
       ])
       if (sRes.status  === 'fulfilled') setStats(sRes.value.data)
       if (pRes.status  === 'fulfilled') setTopPlayers(pRes.value.data || [])
@@ -50,81 +84,73 @@ export default function Dashboard() {
       if (mRes.status  === 'fulfilled') setMatches(mRes.value.data || [])
       if (teRes.status === 'fulfilled') setTeams(teRes.value.data || [])
       if (cRes.status  === 'fulfilled') setCoaches(cRes.value.data || [])
+      if (faRes.status === 'fulfilled') setFreeAgents(faRes.value.data || { players: [], coaches: [] })
+      if (trRes.status === 'fulfilled') setTransfers(trRes.value.data || [])
       setLoading(false)
     }
     load()
   }, [])
 
-  // Specific-game (e.g. Valorant, LoL) selector — scoped to the current modality
-  useEffect(() => { setGameDetail('ALL') }, [gameFilter])
+  // Reset the specific-game selector whenever the modality changes (adjust during render).
+  const [prevGameFilter, setPrevGameFilter] = useState(gameFilter)
+  if (gameFilter !== prevGameFilter) {
+    setPrevGameFilter(gameFilter)
+    setGameDetail('ALL')
+  }
 
+  // Titles available within the current modality — from teams (now the source of
+  // truth for a team's game) unioned with tournaments, so the dropdown is complete.
   const availableGames = useMemo(() => {
-    const set = new Set(
-      tournaments
-        .filter(t => matchesGame(t.game, gameFilter))
-        .map(t => t.specificGame)
-        .filter(Boolean)
-    )
+    const set = new Set([
+      ...teams.filter(t => matchesGame(t.game, gameFilter)).map(t => t.specificGame),
+      ...tournaments.filter(t => matchesGame(t.game, gameFilter)).map(t => t.specificGame),
+    ].filter(Boolean))
     return [...set].sort()
-  }, [tournaments, gameFilter])
+  }, [teams, tournaments, gameFilter])
 
   const gameDetailOptions = useMemo(() => [
     { value: 'ALL', label: 'All Games' },
     ...availableGames.map(g => ({ value: g, label: g })),
   ], [availableGames])
 
-  // teamId -> Set of specific games it competes in (derived from its tournaments)
-  const teamGames = useMemo(() => {
-    const map = {}
-    tournaments.forEach(t => {
-      if (!t.specificGame) return
-      ;(t.participatingTeams || []).forEach(team => {
-        if (team?.id == null) return
-        ;(map[team.id] ||= new Set()).add(t.specificGame)
-      })
-    })
-    return map
-  }, [tournaments])
+  const teamsById = useMemo(() =>
+    Object.fromEntries(teams.map(t => [t.id, t])),
+  [teams])
 
   const teamIdByName = useMemo(() =>
     Object.fromEntries(teams.map(t => [t.name, t.id])),
   [teams])
 
-  const teamMatchesGame   = (teamId) => gameDetail === 'ALL' || !!teamGames[teamId]?.has(gameDetail)
-  const playerMatchesGame = (p) => {
+  // A team belongs to the selected title via its own specificGame field.
+  const teamMatchesGame = useCallback(
+    (teamId) => gameDetail === 'ALL' || teamsById[teamId]?.specificGame === gameDetail,
+  [gameDetail, teamsById])
+  // A player inherits the title of their team; free agents (no team) are excluded
+  // once a specific title is selected.
+  const playerMatchesGame = useCallback((p) => {
     if (gameDetail === 'ALL') return true
     const id = teamIdByName[p.teamName]
     return id != null && teamMatchesGame(id)
-  }
+  }, [gameDetail, teamIdByName, teamMatchesGame])
 
   const filteredTopPlayers = useMemo(() =>
     (gameFilter === 'ALL' ? topPlayers : topPlayers.filter(p => p.playerType === gameFilter))
       .filter(playerMatchesGame),
-  [topPlayers, gameFilter, gameDetail, teamIdByName, teamGames])
-
-  const MODE_ORDER = ['FPS', 'MOBA', 'EFOOTBALL', 'RACING', 'BATTLE_ROYALE']
-
-  const getDominantType = (team) => {
-    const counts = {}
-    ;(team.players || []).forEach(p => {
-      if (p.playerType) counts[p.playerType] = (counts[p.playerType] || 0) + 1
-    })
-    return Object.entries(counts).sort(([, a], [, b]) => b - a)[0]?.[0] ?? null
-  }
+  [topPlayers, gameFilter, playerMatchesGame])
 
   // ALL view: 1 best per discipline in fixed MODE_ORDER (all three widgets stay aligned)
   const allViewTopPlayers = useMemo(() =>
     MODE_ORDER
       .map(type => topPlayers.find(p => p.playerType === type && playerMatchesGame(p)))
       .filter(Boolean),
-  [topPlayers, gameDetail, teamIdByName, teamGames])
+  [topPlayers, playerMatchesGame])
 
   const allViewTopTeams = useMemo(() =>
     MODE_ORDER.map(type => {
       const ofType = teams.filter(t => getDominantType(t) === type && teamMatchesGame(t.id))
       return [...ofType].sort((a, b) => (b.points || 0) - (a.points || 0))[0]
     }).filter(Boolean),
-  [teams, gameDetail, teamGames])
+  [teams, teamMatchesGame])
 
   const allViewTopCoaches = useMemo(() => {
     const teamById = Object.fromEntries(teams.map(t => [t.id, t]))
@@ -141,7 +167,7 @@ export default function Dashboard() {
       if (!best) return null
       return { ...best, _team: teamById[best.team?.id] }
     }).filter(Boolean)
-  }, [coaches, teams, gameDetail, teamGames])
+  }, [coaches, teams, teamMatchesGame])
 
   const filteredTournaments = useMemo(() =>
     tournaments
@@ -208,10 +234,6 @@ export default function Dashboard() {
     return map
   }, [teams])
 
-  const topTeams = useMemo(() =>
-    [...teams].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 5),
-  [teams])
-
   const teamsByType = useMemo(() => {
     const map = { FPS: 0, MOBA: 0, EFOOTBALL: 0, RACING: 0, BATTLE_ROYALE: 0 }
     teams.forEach(team => {
@@ -226,31 +248,36 @@ export default function Dashboard() {
     return map
   }, [teams])
 
-  const topCoaches = useMemo(() =>
-    [...coaches]
-      .sort((a, b) => (b.team?.points || 0) - (a.team?.points || 0))
-      .slice(0, 5),
-  [coaches])
-
   const getWinner = (m) => {
     if (!m.resultRecorded) return null
-    if (m.teamAScore > m.teamBScore) return m.teamA?.name
-    if (m.teamBScore > m.teamAScore) return m.teamB?.name
-    return 'Draw'
+    return m.teamAScore > m.teamBScore ? m.teamA?.name : m.teamB?.name
   }
 
+  // Free agents (players + coaches without a team) as one unified list.
+  const freeAgentList = useMemo(() => {
+    const players = (freeAgents.players || []).map(p => ({
+      key: `p-${p.id}`, kind: 'PLAYER', name: p.nickname || p.fullName,
+      type: p.playerType, nationality: p.nationality, value: p.value, to: `/players/${p.id}`,
+    }))
+    const coaches = (freeAgents.coaches || []).map(c => ({
+      key: `c-${c.id}`, kind: 'COACH', name: c.name,
+      type: c.specialization, nationality: c.nationality, value: c.value, to: `/coaches/${c.id}`,
+    }))
+    return [...players, ...coaches]
+  }, [freeAgents])
+
   const statCards = [
-    { label: 'Players',     value: filteredStats.players,          icon: Users,  color: 'green',  to: '/players'     },
-    { label: 'Teams',       value: filteredStats.teams,            icon: Shield, color: 'cyan',   to: '/teams'       },
-    { label: 'Tournaments', value: filteredStats.tournaments,      icon: Trophy, color: 'purple', to: '/tournaments' },
-    { label: 'Matches',     value: filteredStats.completedMatches, icon: Swords, color: 'blue',   to: '/matches'     },
+    { label: t('nav.players'),     value: filteredStats.players,          icon: Users,  color: 'green',  to: '/players'     },
+    { label: t('nav.teams'),       value: filteredStats.teams,            icon: Shield, color: 'cyan',   to: '/teams'       },
+    { label: t('nav.tournaments'), value: filteredStats.tournaments,      icon: Trophy, color: 'purple', to: '/tournaments' },
+    { label: t('nav.matches'),     value: filteredStats.completedMatches, icon: Swords, color: 'blue',   to: '/matches'     },
   ]
 
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title="Dashboard"
-        subtitle={gameFilter === 'ALL' ? 'Season 2026 · All Disciplines' : 'Season 2026'}
+        title={t('nav.dashboard')}
+        subtitle={gameFilter === 'ALL' ? t('page.dashboardSubAll') : t('page.dashboardSub')}
         badge={gameFilter !== 'ALL' && (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md font-body text-sm font-semibold self-center"
             style={{ background: `${TYPE_COLOR[gameFilter]}18`, color: TYPE_COLOR[gameFilter], border: `1px solid ${TYPE_COLOR[gameFilter]}40` }}>
@@ -262,20 +289,23 @@ export default function Dashboard() {
             value={gameDetail}
             onChange={setGameDetail}
             options={gameDetailOptions}
-            placeholder="All Games"
+            placeholder={t('common.allGames')}
             style={{ width: 190 }}
           />
         )}
       />
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <motion.div variants={staggerGrid} initial="hidden" animate="show"
+        className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         {statCards.map((s) => (
-          <Link key={s.label} to={s.to} className="block">
-            <StatCard {...s} />
-          </Link>
+          <motion.div key={s.label} variants={gridItem}>
+            <Link to={s.to} className="block">
+              <StatCard {...s} />
+            </Link>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       {/* Content area — transitions on filter change */}
       <AnimatePresence mode="wait">
@@ -289,25 +319,25 @@ export default function Dashboard() {
                 {/* Top Players */}
                 <div className="glass-card p-5">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-display text-sm text-text-primary tracking-wide uppercase flex items-center gap-2"><Users size={14} className="text-text-dim" />Top Players</h3>
-                    <Link to="/players" className="font-body text-xs text-accent-green hover:underline cursor-pointer">View all</Link>
+                    <h3 className="font-mono text-[11px] text-text-muted font-semibold uppercase tracking-[0.16em] flex items-center gap-2"><Users size={14} className="text-text-dim" />{t('dash.topPlayers')}</h3>
+                    <Link to="/players" className="font-mono text-[10px] uppercase tracking-wider text-text-dim hover:text-accent-green transition-colors cursor-pointer">{t('common.viewAll')}</Link>
                   </div>
                   {allViewTopPlayers.length === 0 && !loading ? (
-                    <p className="text-sm text-text-dim font-body text-center py-8">Minimum 3 matches to appear.</p>
+                    <p className="text-sm text-text-dim font-body text-center py-8">{t('dash.minMatches')}</p>
                   ) : (
                     <div className="space-y-1">
                       {allViewTopPlayers.map((p, i) => (
-                        <div key={p.id} className="flex items-center gap-3 py-1 px-3 rounded-lg hover:bg-bg-primary transition-colors duration-150">
-                          <span className="font-display text-xs w-4 text-text-dim">{i + 1}</span>
+                        <Link key={p.id} to={`/players/${p.id}`} className="flex items-center gap-3 py-1 px-3 rounded-lg hover:bg-bg-primary transition-colors duration-150">
+                          <span className="font-mono text-xs tabular w-4 text-text-dim">{i + 1}</span>
                           <div className="min-w-0 flex-1">
                             <p className="font-body text-sm text-text-primary font-semibold truncate">{p.nickname}</p>
                             <p className="font-body text-xs text-text-dim truncate">{p.teamName || '—'}</p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <Badge variant={TYPE_BADGE[p.playerType] || 'gray'}>{TYPE_LABEL[p.playerType] || p.playerType}</Badge>
-                            <span className="font-body text-xs font-semibold text-accent-green">{p.winRate}%</span>
+                            <span className="font-mono text-xs font-semibold text-accent-green tabular">{p.winRate}%</span>
                           </div>
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   )}
@@ -316,22 +346,21 @@ export default function Dashboard() {
                 {/* Top Teams */}
                 <div className="glass-card p-5">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-display text-sm text-text-primary tracking-wide uppercase flex items-center gap-2"><Shield size={14} className="text-text-dim" />Top Teams</h3>
-                    <Link to="/teams" className="font-body text-xs text-accent-green hover:underline cursor-pointer">View all</Link>
+                    <h3 className="font-mono text-[11px] text-text-muted font-semibold uppercase tracking-[0.16em] flex items-center gap-2"><Shield size={14} className="text-text-dim" />{t('dash.topTeams')}</h3>
+                    <Link to="/teams" className="font-mono text-[10px] uppercase tracking-wider text-text-dim hover:text-accent-green transition-colors cursor-pointer">{t('common.viewAll')}</Link>
                   </div>
                   {allViewTopTeams.length === 0 && !loading ? (
-                    <p className="text-sm text-text-dim font-body text-center py-8">No teams yet.</p>
+                    <p className="text-sm text-text-dim font-body text-center py-8">{t('dash.noTeams')}</p>
                   ) : (
                     <div className="space-y-1">
                       {allViewTopTeams.map((t, i) => {
                         const wr       = winRate(t.wins, t.losses)
                         const dom      = getDominantType(t)
-                        const modeCol  = TYPE_COLOR[dom] || '#94A3B8'
                         const modeLbl  = TYPE_LABEL[dom] || dom || '—'
                         return (
                           <Link key={t.id} to={`/teams/${t.id}`}
                             className="flex items-center gap-3 py-1 px-3 rounded-lg hover:bg-bg-primary transition-colors duration-150">
-                            <span className="font-display text-xs w-4 flex-shrink-0 text-text-dim">{i + 1}</span>
+                            <span className="font-mono text-xs tabular w-4 flex-shrink-0 text-text-dim">{i + 1}</span>
                             <div className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 text-sm leading-none bg-bg-primary">
                               {teamEmoji(t.name)}
                             </div>
@@ -340,7 +369,7 @@ export default function Dashboard() {
                               <p className="font-body text-xs text-text-dim truncate">{modeLbl}</p>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className="font-body text-xs text-text-dim w-8 text-right">{wr}%</span>
+                              <span className="font-mono text-xs text-text-dim tabular w-8 text-right">{wr}%</span>
                             </div>
                           </Link>
                         )
@@ -352,11 +381,11 @@ export default function Dashboard() {
                 {/* Top Coaches */}
                 <div className="glass-card p-5">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-display text-sm text-text-primary tracking-wide uppercase flex items-center gap-2"><UserCheck size={14} className="text-text-dim" />Top Coaches</h3>
-                    <Link to="/coaches" className="font-body text-xs text-accent-green hover:underline cursor-pointer">View all</Link>
+                    <h3 className="font-mono text-[11px] text-text-muted font-semibold uppercase tracking-[0.16em] flex items-center gap-2"><UserCheck size={14} className="text-text-dim" />{t('dash.topCoaches')}</h3>
+                    <Link to="/coaches" className="font-mono text-[10px] uppercase tracking-wider text-text-dim hover:text-accent-green transition-colors cursor-pointer">{t('common.viewAll')}</Link>
                   </div>
                   {allViewTopCoaches.length === 0 && !loading ? (
-                    <p className="text-sm text-text-dim font-body text-center py-8">No coaches yet.</p>
+                    <p className="text-sm text-text-dim font-body text-center py-8">{t('dash.noCoaches')}</p>
                   ) : (
                     <div className="space-y-1">
                       {allViewTopCoaches.map((c, i) => {
@@ -365,8 +394,8 @@ export default function Dashboard() {
                         const wr    = hasGames ? winRate(team.wins, team.losses) : null
                         const dom   = getDominantType(team)
                         return (
-                          <div key={c.id} className="flex items-center gap-3 py-1 px-3 rounded-lg hover:bg-bg-primary transition-colors duration-150">
-                            <span className="font-display text-xs w-4 flex-shrink-0 text-text-dim">{i + 1}</span>
+                          <Link key={c.id} to={`/coaches/${c.id}`} className="flex items-center gap-3 py-1 px-3 rounded-lg hover:bg-bg-primary transition-colors duration-150">
+                            <span className="font-mono text-xs tabular w-4 flex-shrink-0 text-text-dim">{i + 1}</span>
                             <div className="min-w-0 flex-1">
                               <p className="font-body text-sm text-text-primary font-semibold truncate">{c.name}</p>
                               <p className="font-body text-xs text-text-dim truncate">{team?.name || '—'}</p>
@@ -374,10 +403,10 @@ export default function Dashboard() {
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <Badge variant={TYPE_BADGE[dom] || 'gray'}>{TYPE_LABEL[dom] || dom}</Badge>
                               {wr !== null && (
-                                <span className="font-body text-xs font-semibold text-accent-green w-8 text-right">{wr}%</span>
+                                <span className="font-mono text-xs font-semibold text-accent-green tabular w-8 text-right">{wr}%</span>
                               )}
                             </div>
-                          </div>
+                          </Link>
                         )
                       })}
                     </div>
@@ -389,7 +418,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Stats by Mode */}
                 <div className="glass-card p-5">
-                  <h3 className="font-display text-sm text-text-primary tracking-wide mb-5 uppercase">Stats by Mode</h3>
+                  <h3 className="font-display text-sm text-text-primary tracking-wide mb-5 uppercase">{t('dash.statsByMode')}</h3>
                   <div className="space-y-5">
                     {['FPS', 'MOBA', 'EFOOTBALL', 'RACING', 'BATTLE_ROYALE'].map(type => {
                       const count      = breakdown[type] || 0
@@ -428,13 +457,13 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-2">
                       <Trophy size={15} className="text-accent-purple" />
-                      <h3 className="font-display text-sm text-text-primary tracking-wide uppercase">Tournaments</h3>
+                      <h3 className="font-mono text-[11px] text-text-muted font-semibold uppercase tracking-[0.16em]">{t('dash.tournaments')}</h3>
                       <span className="font-body text-xs text-text-dim">({filteredTournaments.length})</span>
                     </div>
-                    <Link to="/tournaments" className="font-body text-xs text-accent-green hover:underline cursor-pointer">View all</Link>
+                    <Link to="/tournaments" className="font-mono text-[10px] uppercase tracking-wider text-text-dim hover:text-accent-green transition-colors cursor-pointer">{t('common.viewAll')}</Link>
                   </div>
                   {filteredTournaments.length === 0 && !loading ? (
-                    <p className="text-sm text-text-dim font-body text-center py-8">No tournaments yet.</p>
+                    <p className="text-sm text-text-dim font-body text-center py-8">{t('dash.noTournaments')}</p>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {filteredTournaments.slice(0, 6).map(t => (
@@ -445,7 +474,7 @@ export default function Dashboard() {
                             <Trophy size={16} className="text-accent-purple" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-body text-sm font-semibold text-text-primary truncate group-hover:text-white transition-colors">{t.name}</p>
+                            <p className="font-body text-sm font-semibold text-text-primary truncate group-hover:text-accent-green transition-colors">{t.name}</p>
                             <p className="font-body text-xs text-text-dim truncate">{t.game} · {t.participatingTeams?.length ?? 0} teams</p>
                           </div>
                           <Badge variant={STATUS_COLOR[t.status] || 'gray'}>{t.status}</Badge>
@@ -463,10 +492,10 @@ export default function Dashboard() {
                 <div className="glass-card p-5">
                   <div className="flex items-center gap-2 mb-4">
                     <CheckCircle2 size={15} className="text-accent-green" />
-                    <h3 className="font-display text-sm text-text-primary tracking-wide uppercase">Recent Results</h3>
+                    <h3 className="font-mono text-[11px] text-text-muted font-semibold uppercase tracking-[0.16em]">{t('dash.recentResults')}</h3>
                   </div>
                   {recentResults.length === 0 && !loading ? (
-                    <p className="text-sm text-text-dim font-body text-center py-8">No results yet.</p>
+                    <p className="text-sm text-text-dim font-body text-center py-8">{t('dash.noResults')}</p>
                   ) : (
                     <div className="space-y-1">
                       {recentResults.map(m => {
@@ -477,7 +506,7 @@ export default function Dashboard() {
                               <span className="font-body text-xs font-semibold text-text-primary truncate flex-1 flex items-center gap-1">
                                 <span className="text-sm leading-none flex-shrink-0">{teamEmoji(m.teamA?.name)}</span>{m.teamA?.name}
                               </span>
-                              <span className="font-display text-sm font-bold text-text-primary flex-shrink-0 px-2">
+                              <span className="font-mono text-base font-bold text-text-primary tabular flex-shrink-0 px-2">
                                 {m.teamAScore} <span className="text-text-dim text-xs font-body">:</span> {m.teamBScore}
                               </span>
                               <span className="font-body text-xs font-semibold text-text-primary truncate flex-1 text-right flex items-center justify-end gap-1">
@@ -486,9 +515,7 @@ export default function Dashboard() {
                             </div>
                             <div className="flex justify-between items-center mt-1">
                               <span className="font-body text-xs text-text-dim">{m.date}</span>
-                              <Badge variant={winner === 'Draw' ? 'cyan' : 'green'}>
-                                {winner === 'Draw' ? 'Draw' : `${winner} won`}
-                              </Badge>
+                              <Badge variant="green">{t('dash.won', { name: winner })}</Badge>
                             </div>
                           </div>
                         )
@@ -501,10 +528,10 @@ export default function Dashboard() {
                 <div className="glass-card p-5">
                   <div className="flex items-center gap-2 mb-4">
                     <Calendar size={15} className="text-accent-blue" />
-                    <h3 className="font-display text-sm text-text-primary tracking-wide uppercase">Next Matches</h3>
+                    <h3 className="font-mono text-[11px] text-text-muted font-semibold uppercase tracking-[0.16em]">{t('dash.nextMatches')}</h3>
                   </div>
                   {nextMatches.length === 0 && !loading ? (
-                    <p className="text-sm text-text-dim font-body text-center py-8">No upcoming matches.</p>
+                    <p className="text-sm text-text-dim font-body text-center py-8">{t('dash.noUpcoming')}</p>
                   ) : (
                     <div className="space-y-1">
                       {nextMatches.map(m => (
@@ -533,22 +560,22 @@ export default function Dashboard() {
                 {/* Top Players (filtered) */}
                 <div className="glass-card p-5">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-display text-sm text-text-primary tracking-wide uppercase">Top Players</h3>
-                    <Link to="/players" className="font-body text-xs text-accent-green hover:underline cursor-pointer">View all</Link>
+                    <h3 className="font-mono text-[11px] text-text-muted font-semibold uppercase tracking-[0.16em]">{t('dash.topPlayers')}</h3>
+                    <Link to="/players" className="font-mono text-[10px] uppercase tracking-wider text-text-dim hover:text-accent-green transition-colors cursor-pointer">{t('common.viewAll')}</Link>
                   </div>
                   {filteredTopPlayers.length === 0 && !loading ? (
-                    <p className="text-sm text-text-dim font-body text-center py-8">Minimum 3 matches to appear.</p>
+                    <p className="text-sm text-text-dim font-body text-center py-8">{t('dash.minMatches')}</p>
                   ) : (
                     <div className="space-y-2">
                       {filteredTopPlayers.slice(0, 5).map((p, i) => (
-                        <div key={p.id} className="flex items-center gap-3 py-1.5 px-3 rounded-lg hover:bg-bg-primary transition-colors duration-150">
-                          <span className="font-display text-xs w-4 text-text-dim">{i + 1}</span>
+                        <Link key={p.id} to={`/players/${p.id}`} className="flex items-center gap-3 py-1.5 px-3 rounded-lg hover:bg-bg-primary transition-colors duration-150">
+                          <span className="font-mono text-xs tabular w-4 text-text-dim">{i + 1}</span>
                           <div className="min-w-0 flex-1">
                             <p className="font-body text-sm text-text-primary font-semibold truncate">{p.nickname}</p>
                             <p className="font-body text-xs text-text-dim truncate">{p.teamName || '—'}</p>
                           </div>
-                          <span className="font-body text-xs font-semibold text-accent-green flex-shrink-0">{p.winRate}%</span>
-                        </div>
+                          <span className="font-mono text-xs font-semibold text-accent-green tabular flex-shrink-0">{p.winRate}%</span>
+                        </Link>
                       ))}
                     </div>
                   )}
@@ -560,13 +587,13 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-2">
                     <Trophy size={15} className="text-accent-purple" />
-                    <h3 className="font-display text-sm text-text-primary tracking-wide uppercase">Tournaments</h3>
+                    <h3 className="font-mono text-[11px] text-text-muted font-semibold uppercase tracking-[0.16em]">{t('dash.tournaments')}</h3>
                     <span className="font-body text-xs text-text-dim">({filteredTournaments.length})</span>
                   </div>
-                  <Link to="/tournaments" className="font-body text-xs text-accent-green hover:underline cursor-pointer">View all</Link>
+                  <Link to="/tournaments" className="font-mono text-[10px] uppercase tracking-wider text-text-dim hover:text-accent-green transition-colors cursor-pointer">{t('common.viewAll')}</Link>
                 </div>
                 {filteredTournaments.length === 0 && !loading ? (
-                  <p className="text-sm text-text-dim font-body text-center py-8">No tournaments for this mode yet.</p>
+                  <p className="text-sm text-text-dim font-body text-center py-8">{t('dash.noTournaments')}</p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {filteredTournaments.slice(0, 6).map(t => (
@@ -577,7 +604,7 @@ export default function Dashboard() {
                           <Trophy size={16} className="text-accent-purple" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="font-body text-sm font-semibold text-text-primary truncate group-hover:text-white transition-colors">{t.name}</p>
+                          <p className="font-body text-sm font-semibold text-text-primary truncate group-hover:text-accent-green transition-colors">{t.name}</p>
                           <p className="font-body text-xs text-text-dim truncate">{t.game} · {t.participatingTeams?.length ?? 0} teams</p>
                         </div>
                         <Badge variant={STATUS_COLOR[t.status] || 'gray'}>{t.status}</Badge>
@@ -590,6 +617,73 @@ export default function Dashboard() {
           )}
         </motion.div>
       </AnimatePresence>
+
+      {/* Transfer market — global overview, independent of the game filter */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        {/* Free Agents */}
+        <div className="glass-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-mono text-[11px] text-text-muted font-semibold uppercase tracking-[0.16em] flex items-center gap-2">
+              <UserCheck size={14} className="text-text-dim" />{t('dash.freeAgents')}
+            </h3>
+            <Link to="/transfers" className="font-mono text-[10px] uppercase tracking-wider text-text-dim hover:text-accent-green transition-colors cursor-pointer">{t('common.viewAll')}</Link>
+          </div>
+          {freeAgentList.length === 0 && !loading ? (
+            <p className="text-sm text-text-dim font-body text-center py-8">{t('dash.noFreeAgents')}</p>
+          ) : (
+            <div className="space-y-1 max-h-[300px] overflow-y-auto pr-1 -mr-1">
+              {freeAgentList.map(fa => (
+                <Link key={fa.key} to={fa.to}
+                  className="flex items-center gap-3 py-1.5 px-3 rounded-lg hover:bg-bg-primary transition-colors duration-150 group">
+                  <span className="w-7 h-7 rounded-md bg-bg-primary flex items-center justify-center flex-shrink-0 text-sm leading-none">
+                    {fa.kind === 'COACH' ? '🎓' : (TYPE_EMOJI[fa.type] || '🎮')}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-body text-sm text-text-primary font-semibold truncate group-hover:text-accent-green transition-colors">{fa.name}</p>
+                      {fa.type && <Badge variant={TYPE_BADGE[fa.type] || 'gray'}>{TYPE_LABEL[fa.type] || fa.type}</Badge>}
+                    </div>
+                    <p className="font-body text-xs text-text-dim truncate">
+                      {fa.kind === 'COACH' ? t('dash.coach') : t('dash.player')}{fa.nationality ? ` · ${fa.nationality}` : ''}
+                    </p>
+                  </div>
+                  <span className="font-mono text-xs font-semibold text-accent-green flex-shrink-0 tabular-nums">{fmtValue(fa.value)}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Recent Transfers */}
+        <div className="glass-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-mono text-[11px] text-text-muted font-semibold uppercase tracking-[0.16em] flex items-center gap-2">
+              <ArrowLeftRight size={14} className="text-text-dim" />{t('dash.recentTransfers')}
+            </h3>
+            <Link to="/transfers" className="font-mono text-[10px] uppercase tracking-wider text-text-dim hover:text-accent-green transition-colors cursor-pointer">{t('common.viewAll')}</Link>
+          </div>
+          {transfers.length === 0 && !loading ? (
+            <p className="text-sm text-text-dim font-body text-center py-8">{t('dash.noTransfers')}</p>
+          ) : (
+            <div className="space-y-1 max-h-[300px] overflow-y-auto pr-1 -mr-1">
+              {transfers.map(tr => (
+                <div key={tr.id} className="flex items-center gap-3 py-1.5 px-3 rounded-lg hover:bg-bg-primary transition-colors duration-150">
+                  <span className="w-7 h-7 rounded-md bg-bg-primary flex items-center justify-center flex-shrink-0 text-sm leading-none">
+                    {tr.personType === 'COACH' ? '🎓' : (TYPE_EMOJI[tr.personMeta] || '🎮')}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-body text-sm text-text-primary font-semibold truncate">{tr.personName}</p>
+                    <p className="font-body text-xs text-text-dim truncate">
+                      {tr.fromTeam || t('dash.freeAgent')} <span className="text-accent-green">→</span> {tr.toTeam || t('dash.freeAgent')}
+                    </p>
+                  </div>
+                  <span className="font-body text-xs text-text-dim flex-shrink-0">{tr.date}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

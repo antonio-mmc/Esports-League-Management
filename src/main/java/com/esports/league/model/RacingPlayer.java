@@ -14,10 +14,10 @@ public class RacingPlayer extends Player {
 
     public RacingPlayer() {}
 
-    public RacingPlayer(String fullName, String nickname, String password,
+    public RacingPlayer(String fullName, String nickname,
                         int matchesPlayed, int wins, int losses,
                         double avgPosition, int podiums, int fastestLaps, int dnf) {
-        super(fullName, nickname, password, matchesPlayed, wins, losses);
+        super(fullName, nickname, matchesPlayed, wins, losses);
         this.avgPosition = avgPosition;
         this.podiums = podiums;
         this.fastestLaps = fastestLaps;

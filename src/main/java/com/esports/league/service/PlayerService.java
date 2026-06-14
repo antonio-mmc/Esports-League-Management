@@ -7,17 +7,25 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 @Service
 @Transactional
 public class PlayerService {
 
+    private static final Set<String> KNOWN_TYPES =
+        Set.of("FPS", "MOBA", "EFOOTBALL", "RACING", "BATTLE_ROYALE", "GENERIC");
+
     private final PlayerRepository playerRepository;
     private final TeamRepository teamRepository;
+    private final TransferLog transferLog;
 
-    public PlayerService(PlayerRepository playerRepository, TeamRepository teamRepository) {
+    public PlayerService(PlayerRepository playerRepository, TeamRepository teamRepository,
+                         TransferLog transferLog) {
         this.playerRepository = playerRepository;
         this.teamRepository = teamRepository;
+        this.transferLog = transferLog;
     }
 
     public List<Player> findAll() {
@@ -25,24 +33,16 @@ public class PlayerService {
     }
 
     public List<Player> findByType(String type) {
+        String wanted = type.toUpperCase();
+        if (!KNOWN_TYPES.contains(wanted)) return findAll();
         return playerRepository.findAll().stream()
-            .filter(p -> switch (type.toUpperCase()) {
-                case "FPS"          -> p instanceof FPSPlayer;
-                case "MOBA"         -> p instanceof MOBAPlayer;
-                case "EFOOTBALL"    -> p instanceof EFootballPlayer;
-                case "RACING"       -> p instanceof RacingPlayer;
-                case "BATTLE_ROYALE"-> p instanceof BattleRoyalePlayer;
-                case "GENERIC"      -> !(p instanceof FPSPlayer) && !(p instanceof MOBAPlayer)
-                                    && !(p instanceof EFootballPlayer) && !(p instanceof RacingPlayer)
-                                    && !(p instanceof BattleRoyalePlayer);
-                default             -> true;
-            })
+            .filter(p -> wanted.equals(p.getPlayerType()))
             .toList();
     }
 
     public Player findById(Long id) {
         return playerRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Player not found: " + id));
+            .orElseThrow(() -> new ResourceNotFoundException("Player not found: " + id));
     }
 
     public Player create(Player player) {
@@ -52,7 +52,7 @@ public class PlayerService {
         // Replace any client-supplied team stub ({id}) with a managed entity.
         if (player.getTeam() != null && player.getTeam().getId() != null) {
             Team team = teamRepository.findById(player.getTeam().getId())
-                .orElseThrow(() -> new RuntimeException("Team not found: " + player.getTeam().getId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Team not found: " + player.getTeam().getId()));
             player.setTeam(team);
         } else {
             player.setTeam(null);
@@ -63,6 +63,11 @@ public class PlayerService {
     public Player update(Long id, Player updated) {
         Player player = findById(id);
 
+        if (!player.getNickname().equals(updated.getNickname())
+                && playerRepository.existsByNickname(updated.getNickname())) {
+            throw new IllegalArgumentException("Nickname already in use.");
+        }
+
         player.setFullName(updated.getFullName());
         player.setNickname(updated.getNickname());
         player.setMatchesPlayed(updated.getMatchesPlayed());
@@ -72,18 +77,17 @@ public class PlayerService {
         player.setNationality(updated.getNationality());
         player.setCity(updated.getCity());
         player.setAchievements(updated.getAchievements());
-        if (updated.getPassword() != null && !updated.getPassword().isBlank()) {
-            player.setPassword(updated.getPassword());
-        }
 
         // Team assignment from the edit form (an empty selection clears it).
+        String fromTeam = player.getTeam() != null ? player.getTeam().getName() : null;
+        Team newTeam = null;
         if (updated.getTeam() != null && updated.getTeam().getId() != null) {
-            Team team = teamRepository.findById(updated.getTeam().getId())
-                .orElseThrow(() -> new RuntimeException("Team not found: " + updated.getTeam().getId()));
-            player.setTeam(team);
-        } else {
-            player.setTeam(null);
+            newTeam = teamRepository.findById(updated.getTeam().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Team not found: " + updated.getTeam().getId()));
         }
+        String toTeam = newTeam != null ? newTeam.getName() : null;
+        player.setTeam(newTeam);
+        if (!Objects.equals(fromTeam, toTeam)) transferLog.playerMoved(player, fromTeam, toTeam);
 
         if (player instanceof FPSPlayer fps && updated instanceof FPSPlayer upd) {
             fps.setAccuracy(upd.getAccuracy());
@@ -120,13 +124,16 @@ public class PlayerService {
     public Player assignTeam(Long playerId, Long teamId) {
         Player player = findById(playerId);
         Team team = teamRepository.findById(teamId)
-            .orElseThrow(() -> new RuntimeException("Team not found: " + teamId));
+            .orElseThrow(() -> new ResourceNotFoundException("Team not found: " + teamId));
+        String fromTeam = player.getTeam() != null ? player.getTeam().getName() : null;
+        if (!Objects.equals(fromTeam, team.getName())) transferLog.playerMoved(player, fromTeam, team.getName());
         player.setTeam(team);
         return playerRepository.save(player);
     }
 
     public Player removeTeam(Long playerId) {
         Player player = findById(playerId);
+        if (player.getTeam() != null) transferLog.playerMoved(player, player.getTeam().getName(), null);
         player.setTeam(null);
         return playerRepository.save(player);
     }

@@ -1,0 +1,54 @@
+/* Subset of flag-icons (4x3 only) limited to the countries in utils/countries.js.
+   The full flag-icons stylesheet inlines ~260 flags (>400 kB of CSS); this keeps
+   the same .fi / .fi-xx API with only the flags the app actually renders. */
+.fi {
+  position: relative;
+  display: inline-block;
+  width: 1.333333em;
+  line-height: 1em;
+  background-size: contain;
+  background-position: 50%;
+  background-repeat: no-repeat;
+}
+.fi::before { content: '\00a0'; }
+.fi-ar { background-image: url('../node_modules/flag-icons/flags/4x3/ar.svg'); }
+.fi-au { background-image: url('../node_modules/flag-icons/flags/4x3/au.svg'); }
+.fi-bd { background-image: url('../node_modules/flag-icons/flags/4x3/bd.svg'); }
+.fi-br { background-image: url('../node_modules/flag-icons/flags/4x3/br.svg'); }
+.fi-ca { background-image: url('../node_modules/flag-icons/flags/4x3/ca.svg'); }
+.fi-cn { background-image: url('../node_modules/flag-icons/flags/4x3/cn.svg'); }
+.fi-co { background-image: url('../node_modules/flag-icons/flags/4x3/co.svg'); }
+.fi-hr { background-image: url('../node_modules/flag-icons/flags/4x3/hr.svg'); }
+.fi-cz { background-image: url('../node_modules/flag-icons/flags/4x3/cz.svg'); }
+.fi-dk { background-image: url('../node_modules/flag-icons/flags/4x3/dk.svg'); }
+.fi-eg { background-image: url('../node_modules/flag-icons/flags/4x3/eg.svg'); }
+.fi-fi { background-image: url('../node_modules/flag-icons/flags/4x3/fi.svg'); }
+.fi-fr { background-image: url('../node_modules/flag-icons/flags/4x3/fr.svg'); }
+.fi-de { background-image: url('../node_modules/flag-icons/flags/4x3/de.svg'); }
+.fi-gh { background-image: url('../node_modules/flag-icons/flags/4x3/gh.svg'); }
+.fi-in { background-image: url('../node_modules/flag-icons/flags/4x3/in.svg'); }
+.fi-ie { background-image: url('../node_modules/flag-icons/flags/4x3/ie.svg'); }
+.fi-it { background-image: url('../node_modules/flag-icons/flags/4x3/it.svg'); }
+.fi-jp { background-image: url('../node_modules/flag-icons/flags/4x3/jp.svg'); }
+.fi-lb { background-image: url('../node_modules/flag-icons/flags/4x3/lb.svg'); }
+.fi-mx { background-image: url('../node_modules/flag-icons/flags/4x3/mx.svg'); }
+.fi-ma { background-image: url('../node_modules/flag-icons/flags/4x3/ma.svg'); }
+.fi-nl { background-image: url('../node_modules/flag-icons/flags/4x3/nl.svg'); }
+.fi-ng { background-image: url('../node_modules/flag-icons/flags/4x3/ng.svg'); }
+.fi-no { background-image: url('../node_modules/flag-icons/flags/4x3/no.svg'); }
+.fi-pk { background-image: url('../node_modules/flag-icons/flags/4x3/pk.svg'); }
+.fi-pt { background-image: url('../node_modules/flag-icons/flags/4x3/pt.svg'); }
+.fi-ru { background-image: url('../node_modules/flag-icons/flags/4x3/ru.svg'); }
+.fi-sn { background-image: url('../node_modules/flag-icons/flags/4x3/sn.svg'); }
+.fi-kr { background-image: url('../node_modules/flag-icons/flags/4x3/kr.svg'); }
+.fi-es { background-image: url('../node_modules/flag-icons/flags/4x3/es.svg'); }
+.fi-se { background-image: url('../node_modules/flag-icons/flags/4x3/se.svg'); }
+.fi-ch { background-image: url('../node_modules/flag-icons/flags/4x3/ch.svg'); }
+.fi-tw { background-image: url('../node_modules/flag-icons/flags/4x3/tw.svg'); }
+.fi-ua { background-image: url('../node_modules/flag-icons/flags/4x3/ua.svg'); }
+.fi-ae { background-image: url('../node_modules/flag-icons/flags/4x3/ae.svg'); }
+.fi-gb { background-image: url('../node_modules/flag-icons/flags/4x3/gb.svg'); }
+.fi-us { background-image: url('../node_modules/flag-icons/flags/4x3/us.svg'); }
+.fi-gb-eng { background-image: url('../node_modules/flag-icons/flags/4x3/gb-eng.svg'); }
+.fi-gb-sct { background-image: url('../node_modules/flag-icons/flags/4x3/gb-sct.svg'); }
+.fi-gb-wls { background-image: url('../node_modules/flag-icons/flags/4x3/gb-wls.svg'); }

@@ -9,6 +9,7 @@ import {
 import Badge from '../components/Badge'
 import Modal from '../components/Modal'
 import { useToast } from '../components/Toast'
+import { useT } from '../context/LanguageContext'
 import { teamApi, tournamentApi, playerApi, coachApi, matchApi } from '../services/api'
 import { teamEmoji } from '../utils/teamEmoji'
 
@@ -20,17 +21,8 @@ const TYPE_META = {
   BATTLE_ROYALE: { label: 'Battle Royale',color: 'red',    badge: 'red',    hex: '#EF4444', icon: Skull      },
 }
 
-const COUNTRY_CODE = {
-  'Portugal': 'PT', 'Spain': 'ES', 'Japan': 'JP', 'Russia': 'RU',
-  'Ghana': 'GH', 'Denmark': 'DK', 'Sweden': 'SE', 'Italy': 'IT',
-  'Egypt': 'EG', 'France': 'FR', 'Brazil': 'BR', 'Germany': 'DE',
-  'South Korea': 'KR', 'Czech Republic': 'CZ', 'Senegal': 'SN',
-  'Ireland': 'IE', 'Croatia': 'HR', 'Lebanon': 'LB', 'Colombia': 'CO',
-  'Norway': 'NO', 'Pakistan': 'PK', 'USA': 'US',
-  'Mexico': 'MX', 'Morocco': 'MA', 'Netherlands': 'NL', 'Argentina': 'AR',
-  'India': 'IN', 'Nigeria': 'NG', 'Ukraine': 'UA', 'China': 'CN',
-  'Bangladesh': 'BD',
-}
+import { COUNTRY_CODE } from '../utils/countries'
+import { GAME_TITLES } from '../utils/gameMeta'
 
 function FlagIcon({ nationality, size = 16 }) {
   const code = COUNTRY_CODE[nationality]
@@ -116,6 +108,7 @@ export default function TeamDetail() {
   const trophyBtnRef = useRef(null)
   const trophyPopRef = useRef(null)
   const toast = useToast()
+  const { t } = useT()
 
   useEffect(() => {
     if (!showTrophies) return
@@ -141,6 +134,7 @@ export default function TeamDetail() {
       .catch(console.error)
       .finally(() => setLoad(false))
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only when the route id changes
   useEffect(() => { loadTeam() }, [id])
 
   useEffect(() => {
@@ -181,9 +175,11 @@ export default function TeamDetail() {
   }, [teamMatches])
 
   const openEdit = () => {
+    const game = team.game || 'FPS'
     setForm({
       name: team.name || '',
-      game: team.game || 'FPS',
+      game,
+      specificGame: team.specificGame || GAME_TITLES[game]?.[0] || '',
       nationality: team.nationality || '',
       wins: team.wins ?? 0,
       losses: team.losses ?? 0,
@@ -194,12 +190,15 @@ export default function TeamDetail() {
     setModal(true)
   }
 
+  const setGame = (game) => setForm(f => ({ ...f, game, specificGame: GAME_TITLES[game]?.[0] || '' }))
+
   const handleSave = async () => {
     setSaving(true)
     try {
       await teamApi.update(team.id, {
         name: form.name,
         game: form.game,
+        specificGame: form.specificGame || null,
         nationality: form.nationality || null,
         wins: Number(form.wins),
         losses: Number(form.losses),
@@ -208,9 +207,9 @@ export default function TeamDetail() {
         foundedYear: form.foundedYear ? Number(form.foundedYear) : null,
       })
       setModal(false)
-      toast('Team updated.', 'success')
+      toast(t('teams.updated'), 'success')
       loadTeam()
-    } catch(e) { toast(e?.response?.data?.message || 'Failed to save.', 'error') }
+    } catch(e) { toast(e?.response?.data?.error || e?.response?.data?.message || t('teams.saveFail'), 'error') }
     finally { setSaving(false) }
   }
 
@@ -228,18 +227,18 @@ export default function TeamDetail() {
   const addPlayer = async (playerId) => {
     try {
       await playerApi.assignTeam(playerId, team.id)
-      toast('Player added to team.', 'success')
+      toast(t('dt.playerAdded'), 'success')
       setPlayerModal(false)
       loadTeam()
-    } catch(e) { toast(e?.response?.data?.message || 'Failed to add player.', 'error') }
+    } catch(e) { toast(e?.response?.data?.error || e?.response?.data?.message || t('dt.playerAddFail'), 'error') }
   }
 
   const removePlayer = async (playerId) => {
     try {
       await playerApi.removeTeam(playerId)
-      toast('Player removed from team.', 'info')
+      toast(t('dt.playerRemoved'), 'info')
       loadTeam()
-    } catch(e) { toast(e?.response?.data?.message || 'Failed to remove player.', 'error') }
+    } catch(e) { toast(e?.response?.data?.error || e?.response?.data?.message || t('dt.playerRemoveFail'), 'error') }
   }
 
   const openAssignCoach = async () => {
@@ -254,18 +253,18 @@ export default function TeamDetail() {
   const assignCoach = async (coachId) => {
     try {
       await coachApi.assignTeam(coachId, team.id)
-      toast('Coach assigned.', 'success')
+      toast(t('dt.coachAssigned'), 'success')
       setCoachModal(false)
       loadTeam()
-    } catch(e) { toast(e?.response?.data?.message || 'Failed to assign coach.', 'error') }
+    } catch(e) { toast(e?.response?.data?.error || e?.response?.data?.message || t('dt.coachAssignFail'), 'error') }
   }
 
   const removeCoach = async (coachId) => {
     try {
       await coachApi.removeTeam(coachId)
-      toast('Coach removed from team.', 'info')
+      toast(t('dt.coachRemoved'), 'info')
       loadTeam()
-    } catch(e) { toast(e?.response?.data?.message || 'Failed to remove coach.', 'error') }
+    } catch(e) { toast(e?.response?.data?.error || e?.response?.data?.message || t('dt.coachRemoveFail'), 'error') }
   }
 
   if (loading) {
@@ -279,8 +278,8 @@ export default function TeamDetail() {
   if (!team) {
     return (
       <div className="text-center py-32">
-        <p className="font-body text-text-muted">Team not found.</p>
-        <Link to="/teams" className="btn-ghost mt-4 inline-flex">Back</Link>
+        <p className="font-body text-text-muted">{t('dt.teamNotFound')}</p>
+        <Link to="/teams" className="btn-ghost mt-4 inline-flex">{t('common.back', { target: t('nav.teams') })}</Link>
       </div>
     )
   }
@@ -335,7 +334,7 @@ export default function TeamDetail() {
     <div className="animate-fade-in">
       <Link to="/teams" className="inline-flex items-center gap-2 text-text-muted hover:text-text-primary font-body text-sm mb-6 transition-colors cursor-pointer group">
         <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
-        Back to Teams
+        {t('common.back', { target: t('nav.teams') })}
       </Link>
 
       {/* Hero */}
@@ -351,12 +350,13 @@ export default function TeamDetail() {
               <div className="flex items-center gap-2 mt-1">
                 {team.nationality && <FlagIcon nationality={team.nationality} size={18} />}
                 {gameMeta && <Badge variant={gameMeta.badge}>{gameMeta.label}</Badge>}
+                {team.specificGame && <span className="font-body text-xs text-text-muted">{team.specificGame}</span>}
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <StatPill label="Matches"  value={total || 0}       accent="#06B6D4" />
-            <StatPill label="Win Rate" value={`${winRate}%`}    accent={barColor} />
+            <StatPill label={t('players.matches')}  value={total || 0}       accent="#06B6D4" />
+            <StatPill label={t('dt.winRate')} value={`${winRate}%`}    accent={barColor} />
             <button ref={trophyBtnRef} onClick={toggleTrophies}
               className={`flex flex-col items-center px-4 py-3 rounded-xl border transition-all duration-150 cursor-pointer ${
                 showTrophies
@@ -393,17 +393,17 @@ export default function TeamDetail() {
         <div className="lg:col-span-2 glass-card p-5">
           <div className="flex items-center gap-2 mb-5">
             <Users size={15} className="text-accent-green" />
-            <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Players</h2>
+            <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">{t('nav.players')}</h2>
             <span className="font-body text-xs text-text-dim ml-1">({players.length})</span>
             <button onClick={openAddPlayer}
               className="ml-auto w-6 h-6 rounded-lg flex items-center justify-center text-text-dim hover:text-accent-green hover:bg-accent-green/10 transition-all duration-150 cursor-pointer"
-              title="Add player">
+              title={t('dt.addPlayer')}>
               <UserPlus size={13} />
             </button>
           </div>
 
           {players.length === 0 ? (
-            <p className="text-sm text-text-dim font-body text-center py-10">No players in this team.</p>
+            <p className="text-sm text-text-dim font-body text-center py-10">{t('dt.noPlayers')}</p>
           ) : (
             <div className="space-y-1">
               {players.map((p) => {
@@ -446,7 +446,7 @@ export default function TeamDetail() {
                     </Link>
                     <button onClick={() => removePlayer(p.id)}
                       className="w-6 h-6 mt-2 rounded-lg flex items-center justify-center text-text-dim hover:text-red-400 hover:bg-red-400/10 transition-all duration-150 cursor-pointer flex-shrink-0"
-                      title="Remove from team">
+                      title={t('dt.removeFromTeam')}>
                       <X size={12} />
                     </button>
                   </div>
@@ -467,12 +467,12 @@ export default function TeamDetail() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <UserCheck size={15} className="text-accent-green" />
-                  <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Coach</h2>
+                  <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">{t('col.coach')}</h2>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={openAssignCoach}
                     className="w-6 h-6 rounded-lg flex items-center justify-center text-text-dim hover:text-accent-green hover:bg-accent-green/10 transition-all duration-150 cursor-pointer"
-                    title={coach ? 'Change coach' : 'Assign coach'}>
+                    title={coach ? t('dt.changeCoach') : t('dt.assignCoach')}>
                     <UserPlus size={13} />
                   </button>
                   {coachHistory.length > 0 && (
@@ -500,20 +500,20 @@ export default function TeamDetail() {
                   </Link>
                   <button onClick={() => removeCoach(coach.id)}
                     className="w-6 h-6 rounded-lg flex items-center justify-center text-text-dim hover:text-red-400 hover:bg-red-400/10 transition-all duration-150 cursor-pointer flex-shrink-0"
-                    title="Remove coach">
+                    title={t('dt.removeCoach')}>
                     <X size={12} />
                   </button>
                 </div>
               ) : (
                 <button onClick={openAssignCoach}
                   className="w-full font-body text-sm text-text-dim text-center py-4 hover:text-accent-green transition-colors cursor-pointer rounded-xl hover:bg-accent-green/5">
-                  No coach assigned. Click to assign.
+                  {t('dt.noCoachAssigned')}
                 </button>
               )}
 
               {showCoachHistory && coachHistory.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-bg-border space-y-2">
-                  <p className="font-body text-xs text-text-dim uppercase tracking-wider">Past Coaches</p>
+                  <p className="font-body text-xs text-text-dim uppercase tracking-wider">{t('dt.pastCoaches')}</p>
                   {coachHistory.map((entry, i) => (
                     <div key={i} className="flex items-center gap-2 px-1">
                       <History size={11} className="text-text-dim flex-shrink-0" />
@@ -528,20 +528,20 @@ export default function TeamDetail() {
             <div className="glass-card p-5">
               <div className="flex items-center gap-2 mb-4">
                 <Building2 size={15} className="text-accent-cyan" />
-                <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Team Info</h2>
+                <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">{t('dt.teamInfo')}</h2>
               </div>
               <div className="space-y-3">
                 {team.foundedYear ? (
                   <div className="flex items-center gap-3 px-1">
                     <Calendar size={13} className="text-text-dim flex-shrink-0" />
-                    <span className="font-body text-xs text-text-dim flex-1">Founded</span>
+                    <span className="font-body text-xs text-text-dim flex-1">{t('col.foundedYear')}</span>
                     <span className="font-display text-sm text-text-primary">{team.foundedYear}</span>
                   </div>
                 ) : null}
                 {team.city ? (
                   <div className="flex items-center gap-3 px-1">
                     <MapPin size={13} className="text-text-dim flex-shrink-0" />
-                    <span className="font-body text-xs text-text-dim flex-1">City</span>
+                    <span className="font-body text-xs text-text-dim flex-1">{t('col.city')}</span>
                     <span className="font-display text-sm text-text-primary">{team.city}</span>
                   </div>
                 ) : null}
@@ -556,10 +556,10 @@ export default function TeamDetail() {
           <div className="glass-card p-5">
             <div className="flex items-center gap-2 mb-4">
               <Trophy size={15} className="text-accent-purple" />
-              <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Tournaments</h2>
+              <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">{t('nav.tournaments')}</h2>
             </div>
             {tournaments.length === 0 ? (
-              <p className="font-body text-sm text-text-dim text-center py-4">No tournaments.</p>
+              <p className="font-body text-sm text-text-dim text-center py-4">{t('dt.noTournaments')}</p>
             ) : (
               <div className="space-y-2">
                 {tournaments.map(t => {
@@ -598,7 +598,7 @@ export default function TeamDetail() {
         <div className="glass-card p-5 mt-6">
           <div className="flex items-center gap-2 mb-4">
             <Swords size={15} className="text-accent-cyan" />
-            <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">Match History</h2>
+            <h2 className="font-display text-sm text-text-primary uppercase tracking-wide">{t('dt.matchHistory')}</h2>
             <span className="font-body text-xs text-text-dim ml-1">({teamMatches.length})</span>
           </div>
           <div ref={matchContainerRef} className="space-y-1 max-h-80 overflow-y-auto pr-1">
@@ -629,7 +629,7 @@ export default function TeamDetail() {
                   <span className="font-body text-xs text-text-dim flex-shrink-0">{fmtDate(m.date)}</span>
                   {m.resultRecorded
                     ? <Badge variant={won ? 'green' : lost ? 'red' : 'cyan'}>{won ? 'W' : lost ? 'L' : 'D'}</Badge>
-                    : <Badge variant="gray">Pending</Badge>}
+                    : <Badge variant="gray">{t('mt.pending')}</Badge>}
                 </div>
               )
             })}
@@ -663,12 +663,12 @@ export default function TeamDetail() {
       )}
 
       {/* Add Player Modal */}
-      <Modal open={playerModal} onClose={() => setPlayerModal(false)} title="Add Player" width="max-w-md">
+      <Modal open={playerModal} onClose={() => setPlayerModal(false)} title={t('dt.addPlayerTitle')} width="max-w-md">
         <div className="space-y-3">
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-primary border border-bg-border focus-within:border-accent-green/40 transition-colors">
             <Search size={13} className="text-text-dim flex-shrink-0" />
             <input value={playerSearch} onChange={e => setPlayerSearch(e.target.value)}
-              placeholder="Search free agents..."
+              placeholder={t('dt.searchFreeAgents')}
               className="bg-transparent font-body text-sm text-text-primary placeholder:text-text-dim outline-none flex-1" />
           </div>
           <div className="space-y-1 max-h-72 overflow-y-auto">
@@ -677,7 +677,7 @@ export default function TeamDetail() {
               p.fullName.toLowerCase().includes(playerSearch.toLowerCase())
             ).length === 0 ? (
               <p className="font-body text-sm text-text-dim text-center py-8">
-                {freeAgents.length === 0 ? 'No free agents available.' : 'No matches found.'}
+                {freeAgents.length === 0 ? t('dt.noFreeAgents') : t('mt.none')}
               </p>
             ) : (
               freeAgents
@@ -710,12 +710,12 @@ export default function TeamDetail() {
       </Modal>
 
       {/* Assign Coach Modal */}
-      <Modal open={coachModal} onClose={() => setCoachModal(false)} title="Assign Coach" width="max-w-md">
+      <Modal open={coachModal} onClose={() => setCoachModal(false)} title={t('dt.assignCoachTitle')} width="max-w-md">
         <div className="space-y-3">
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-primary border border-bg-border focus-within:border-accent-green/40 transition-colors">
             <Search size={13} className="text-text-dim flex-shrink-0" />
             <input value={coachSearch} onChange={e => setCoachSearch(e.target.value)}
-              placeholder="Search free agent coaches..."
+              placeholder={t('dt.searchFreeCoaches')}
               className="bg-transparent font-body text-sm text-text-primary placeholder:text-text-dim outline-none flex-1" />
           </div>
           <div className="space-y-1 max-h-72 overflow-y-auto">
@@ -723,7 +723,7 @@ export default function TeamDetail() {
               c.name.toLowerCase().includes(coachSearch.toLowerCase())
             ).length === 0 ? (
               <p className="font-body text-sm text-text-dim text-center py-8">
-                {freeCoaches.length === 0 ? 'No free agent coaches available.' : 'No matches found.'}
+                {freeCoaches.length === 0 ? t('dt.noFreeCoaches') : t('mt.none')}
               </p>
             ) : (
               freeCoaches
@@ -748,11 +748,11 @@ export default function TeamDetail() {
       </Modal>
 
       {/* Edit Modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title="Edit Team" width="max-w-xl">
+      <Modal open={modal} onClose={() => setModal(false)} title={t('teams.edit')} width="max-w-xl">
         <div className="space-y-4">
           <div className="flex gap-2">
             {Object.entries(TYPE_META).map(([type, meta]) => (
-              <button key={type} onClick={() => set('game', type)}
+              <button key={type} onClick={() => setGame(type)}
                 className={`flex-1 py-1.5 rounded-lg border font-body text-xs font-semibold transition-all duration-150 cursor-pointer ${
                   form.game === type
                     ? `border-accent-${meta.color} bg-accent-${meta.color}/10 text-accent-${meta.color}`
@@ -764,39 +764,49 @@ export default function TeamDetail() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Team Name">
+            <Field label={t('col.name')}>
               <input className="input-field" value={form.name || ''} onChange={e => set('name', e.target.value)} placeholder="Team Alpha" />
             </Field>
-            <Field label="Nationality">
-              <input className="input-field" value={form.nationality || ''} onChange={e => set('nationality', e.target.value)} placeholder="Portugal" />
+            <Field label={t('col.game')}>
+              <select className="input-field" value={form.specificGame || ''} onChange={e => set('specificGame', e.target.value)}>
+                {(GAME_TITLES[form.game] || []).map(title => (
+                  <option key={title} value={title}>{title}</option>
+                ))}
+              </select>
             </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="City">
+            <Field label={t('col.nation')}>
+              <input className="input-field" value={form.nationality || ''} onChange={e => set('nationality', e.target.value)} placeholder="Portugal" />
+            </Field>
+            <Field label={t('col.city')}>
               <input className="input-field" value={form.city || ''} onChange={e => set('city', e.target.value)} placeholder="Porto" />
             </Field>
-            <Field label="Founded Year">
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            <Field label={t('col.foundedYear')}>
               <input type="number" className="input-field" value={form.foundedYear || ''} onChange={e => set('foundedYear', e.target.value)} placeholder="2022" min="1990" max="2030" />
             </Field>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Wins">
+            <Field label={t('players.wins')}>
               <input type="number" className="input-field" value={form.wins ?? 0} onChange={e => set('wins', e.target.value)} min="0" />
             </Field>
-            <Field label="Losses">
+            <Field label={t('players.losses')}>
               <input type="number" className="input-field" value={form.losses ?? 0} onChange={e => set('losses', e.target.value)} min="0" />
             </Field>
-            <Field label="Trophies">
+            <Field label={t('col.trophies')}>
               <input type="number" className="input-field" value={form.trophies ?? 0} onChange={e => set('trophies', e.target.value)} min="0" />
             </Field>
           </div>
 
           <div className="flex gap-3 justify-end pt-1">
-            <button onClick={() => setModal(false)} className="btn-ghost">Cancel</button>
+            <button onClick={() => setModal(false)} className="btn-ghost">{t('common.cancel')}</button>
             <button onClick={handleSave} disabled={saving} className="btn-primary">
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? t('common.saving') : t('common.save')}
             </button>
           </div>
         </div>

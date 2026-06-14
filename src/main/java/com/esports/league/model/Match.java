@@ -69,6 +69,7 @@ public class Match {
     /** Records a result for the first time, applying its effect to both teams' records. */
     public void recordResult(int scoreA, int scoreB) {
         if (resultRecorded) throw new IllegalStateException("Result already recorded.");
+        validateScores(scoreA, scoreB);
         this.teamAScore = scoreA;
         this.teamBScore = scoreB;
         this.resultRecorded = true;
@@ -80,11 +81,22 @@ public class Match {
      * then applies the new one so points/wins/losses stay consistent.
      */
     public void updateResult(int scoreA, int scoreB) {
+        validateScores(scoreA, scoreB);
         if (resultRecorded) revertOutcome();
         this.teamAScore = scoreA;
         this.teamBScore = scoreB;
         this.resultRecorded = true;
         applyOutcome();
+    }
+
+    /** Matches are decided — scores must be non-negative and there are no draws. */
+    private static void validateScores(int scoreA, int scoreB) {
+        if (scoreA < 0 || scoreB < 0) {
+            throw new IllegalArgumentException("Scores cannot be negative.");
+        }
+        if (scoreA == scoreB) {
+            throw new IllegalArgumentException("A match cannot end in a draw — the scores must differ.");
+        }
     }
 
     /** Reverts this match's effect on both teams' records (used before deleting a played match). */
@@ -96,18 +108,17 @@ public class Match {
         if (teamAScore > teamBScore) {
             teamA.registerWin();
             teamB.registerLoss();
-        } else if (teamBScore > teamAScore) {
+        } else {
             teamB.registerWin();
             teamA.registerLoss();
         }
-        // Equal scores → draw: no win/loss is registered for either team.
     }
 
     private void revertOutcome() {
         if (teamAScore > teamBScore) {
             teamA.unregisterWin();
             teamB.unregisterLoss();
-        } else if (teamBScore > teamAScore) {
+        } else {
             teamB.unregisterWin();
             teamA.unregisterLoss();
         }

@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import { Plus, Crosshair, Sword, Footprints, Car, Skull, Trash2, Edit2, Search, X, ChevronRight, ChevronDown } from 'lucide-react'
 import { useSearchParams, Link, useNavigate } from 'react-router-dom'
 import { useGameFilter } from '../context/GameFilterContext'
+import { useT } from '../context/LanguageContext'
 import PageHeader from '../components/PageHeader'
 import DataTable from '../components/DataTable'
 import Modal from '../components/Modal'
@@ -19,20 +20,7 @@ const TYPE_META = {
   BATTLE_ROYALE:{ label: 'Battle Royale',color: 'red',    icon: Skull,      hex: '#EF4444' },
 }
 
-const COUNTRY_CODE = {
-  'Portugal': 'PT', 'Spain': 'ES', 'Japan': 'JP', 'Russia': 'RU',
-  'Ghana': 'GH', 'Denmark': 'DK', 'Sweden': 'SE', 'Italy': 'IT',
-  'Egypt': 'EG', 'France': 'FR', 'Brazil': 'BR', 'Germany': 'DE',
-  'South Korea': 'KR', 'Czech Republic': 'CZ', 'Senegal': 'SN',
-  'Ireland': 'IE', 'Croatia': 'HR', 'Lebanon': 'LB', 'Colombia': 'CO',
-  'Norway': 'NO', 'Pakistan': 'PK', 'USA': 'US',
-  'Mexico': 'MX', 'Morocco': 'MA', 'Netherlands': 'NL', 'Argentina': 'AR',
-  'India': 'IN', 'Nigeria': 'NG', 'Ukraine': 'UA', 'China': 'CN',
-  'Bangladesh': 'BD',
-}
-const flagEmoji = code => code
-  ? code.toUpperCase().split('').map(c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)).join('')
-  : ''
+import { COUNTRY_CODE, flagEmoji } from '../utils/countries'
 
 function FlagIcon({ nationality, size = 16 }) {
   const code = COUNTRY_CODE[nationality]
@@ -41,6 +29,7 @@ function FlagIcon({ nationality, size = 16 }) {
 }
 
 function AgeFilter({ ageMin, ageMax, onChange }) {
+  const { t } = useT()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -53,7 +42,7 @@ function AgeFilter({ ageMin, ageMax, onChange }) {
   const hasFilter = ageMin || ageMax
   const displayLabel = hasFilter
     ? (ageMin && ageMax ? `${ageMin} – ${ageMax}` : ageMin ? `${ageMin}+` : `≤ ${ageMax}`)
-    : 'All Ages'
+    : t('players.allAges')
 
   const clear = () => { onChange('', ''); setOpen(false) }
 
@@ -70,18 +59,18 @@ function AgeFilter({ ageMin, ageMax, onChange }) {
       </div>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 rounded-xl border border-bg-border p-3"
-          style={{ background: 'rgba(9,15,29,0.98)', backdropFilter: 'blur(20px)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', width: 192 }}>
-          <p className="font-body text-xs text-text-dim uppercase tracking-wider mb-2.5">Age range</p>
+        <div className="absolute top-full left-0 mt-1 z-50 rounded border border-bg-border p-3"
+          style={{ background: 'rgb(var(--bg-elevated))', boxShadow: '0 12px 40px rgba(0,0,0,0.35)', width: 192 }}>
+          <p className="eyebrow mb-2.5">{t('players.ageRange')}</p>
           <div className="flex items-center gap-2">
             <input type="number" min="0" max="99" value={ageMin}
               onChange={e => onChange(e.target.value, ageMax)}
-              placeholder="Min"
+              placeholder={t('players.min')}
               className="input-field text-center px-2" style={{ width: 72 }} />
             <span className="font-body text-text-dim text-sm flex-shrink-0">–</span>
             <input type="number" min="0" max="99" value={ageMax}
               onChange={e => onChange(ageMin, e.target.value)}
-              placeholder="Max"
+              placeholder={t('players.max')}
               className="input-field text-center px-2" style={{ width: 72 }} />
           </div>
         </div>
@@ -144,6 +133,7 @@ function Field({ label, children }) {
 }
 
 export default function Players() {
+  const { t } = useT()
   const [players, setPlayers] = useState([])
   const [teams, setTeams]     = useState([])
   const [loading, setLoading] = useState(true)
@@ -153,7 +143,7 @@ export default function Players() {
   const [saving, setSaving]   = useState(false)
   const navigate = useNavigate()
   const { gameFilter } = useGameFilter()
-  const [filter,            setFilter]           = useState('ALL')
+  const [filter,            setFilter]           = useState(gameFilter)
   const [teamFilter,        setTeamFilter]        = useState('')
   const [nationalityFilter, setNationalityFilter] = useState('')
   const [ageMin,            setAgeMin]            = useState('')
@@ -175,7 +165,12 @@ export default function Players() {
     }
   }
 
-  useEffect(() => { setFilter(gameFilter) }, [gameFilter])
+  // Follow the global modality filter when it changes (adjust during render).
+  const [prevGameFilter, setPrevGameFilter] = useState(gameFilter)
+  if (gameFilter !== prevGameFilter) {
+    setPrevGameFilter(gameFilter)
+    setFilter(gameFilter)
+  }
 
   const searchHighlight = searchParams.get('q') || ''
 
@@ -187,6 +182,8 @@ export default function Players() {
       setTeams(tRes.data || [])
     } finally { setLoading(false) }
   }
+  // Intentional one-time fetch on mount; the loading flag set inside load() is expected.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load() }, [])
 
   const openCreate = () => { setEditing(null); setForm(emptyForm); setModal(true) }
@@ -214,25 +211,25 @@ export default function Players() {
       if (editing) await playerApi.update(editing.id, payload)
       else         await playerApi.create(payload)
       setModal(false)
-      toast(editing ? 'Player updated.' : 'Player created successfully.', 'success')
+      toast(editing ? t('players.updated') : t('players.created'), 'success')
       load()
-    } catch(e) { toast(e?.response?.data?.message || 'Failed to save.', 'error') }
+    } catch(e) { toast(e?.response?.data?.error || e?.response?.data?.message || t('players.saveFail'), 'error') }
     finally { setSaving(false) }
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete player?')) return
+    if (!confirm(t('players.confirmDelete'))) return
     try {
       await playerApi.delete(id)
-      toast('Player deleted.', 'info')
+      toast(t('players.deleted'), 'info')
       load()
-    } catch(e) { toast(e?.response?.data?.message || 'Failed to delete.', 'error') }
+    } catch(e) { toast(e?.response?.data?.error || e?.response?.data?.message || t('players.deleteFail'), 'error') }
   }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const modeOptions = [
-    { value: 'ALL',          label: 'All Games'    },
+    { value: 'ALL',          label: t('common.allGames') },
     { value: 'FPS',          label: 'FPS'          },
     { value: 'MOBA',         label: 'MOBA'         },
     { value: 'EFOOTBALL',    label: 'eFootball'    },
@@ -241,16 +238,16 @@ export default function Players() {
   ]
 
   const teamOptions = useMemo(() => [
-    { value: '',     label: 'All Teams'   },
-    { value: 'FREE', label: 'Free Agents' },
-    ...teams.map(t => ({ value: String(t.id), label: `${teamEmoji(t.name)} ${t.name}` })),
-  ], [teams])
+    { value: '',     label: t('common.allTeams') },
+    { value: 'FREE', label: t('players.freeAgents') },
+    ...teams.map(tm => ({ value: String(tm.id), label: `${teamEmoji(tm.name)} ${tm.name}` })),
+  ], [teams, t])
 
   const nationalityOptions = useMemo(() => {
     const nations = [...new Set(players.map(p => p.nationality).filter(Boolean))].sort()
     return [
-      { value: '', label: 'All Nations' },
-      ...nations.map(n => ({ value: n, label: `${flagEmoji(COUNTRY_CODE[n])} ${n}`.trim() })),
+      { value: '', label: t('common.allNations') },
+      ...nations.map(n => ({ value: n, label: `${flagEmoji(n)} ${n}`.trim() })),
     ]
   }, [players])
 
@@ -306,7 +303,7 @@ export default function Players() {
     : null
 
   const columns = [
-    { key: 'nickname', label: 'Nickname', sortable: true, render: (v, r) => {
+    { key: 'nickname', label: t('col.nickname'), sortable: true, render: (v, r) => {
       const meta = TYPE_META[r.playerType]
       const Icon = meta?.icon
       const hex  = meta?.hex || '#94A3B8'
@@ -320,8 +317,8 @@ export default function Players() {
         </Link>
       )
     }},
-    { key: 'fullName',    label: 'Full Name', sortable: true },
-    { key: 'nationality', label: 'Nation', sortable: true, render: (v) => {
+    { key: 'fullName',    label: t('col.fullName'), sortable: true },
+    { key: 'nationality', label: t('col.nation'), sortable: true, render: (v) => {
       if (!v) return <span className="text-text-dim">—</span>
       const code = COUNTRY_CODE[v] || v.slice(0, 3).toUpperCase()
       return (
@@ -331,23 +328,23 @@ export default function Players() {
         </span>
       )
     }},
-    { key: 'age', label: 'Age', sortable: true, render: (_, r) => {
+    { key: 'age', label: t('col.age'), sortable: true, render: (_, r) => {
       const age = r.age ?? getAge(r.birthDate)
       return age != null ? <span className="font-body text-sm text-text-primary">{age}</span> : <span className="text-text-dim">—</span>
     }},
-    { key: 'playerType',  label: 'Mode', sortable: true, render: (v) => {
+    { key: 'playerType',  label: t('col.mode'), sortable: true, render: (v) => {
       const m = TYPE_META[v] || {}
       return <Badge variant={m.color || 'gray'}>{m.label || v}</Badge>
     }},
-    { key: 'matchesPlayed', label: 'Matches', sortable: true },
-    { key: 'wins',          label: 'W',       sortable: true },
-    { key: 'losses',        label: 'L',       sortable: true },
-    { key: 'team',          label: 'Team',    sortable: true, render: (v) => v?.name
+    { key: 'matchesPlayed', label: t('col.matches'), sortable: true },
+    { key: 'wins',          label: t('col.w'),       sortable: true },
+    { key: 'losses',        label: t('col.l'),       sortable: true },
+    { key: 'team',          label: t('col.team'),    sortable: true, render: (v) => v?.name
       ? <span className="flex items-center gap-1.5"><span>{teamEmoji(v.name)}</span>{v.name}</span>
-      : <span className="text-sm font-semibold px-2 py-0.5 rounded-full font-body bg-bg-border/40 text-text-muted border border-bg-border">Free</span>
+      : <span className="text-sm font-semibold px-2 py-0.5 rounded-full font-body bg-bg-border/40 text-text-muted border border-bg-border">{t('players.free')}</span>
     },
     { key: '_actions', label: '', render: (_, r) => (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
         <button onClick={() => navigate(`/players/${r.id}`)} className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-primary transition-all duration-150 cursor-pointer">
           <ChevronRight size={13} />
         </button>
@@ -364,25 +361,25 @@ export default function Players() {
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title="Players"
-        subtitle={`${players.length} registered players`}
+        title={t('nav.players')}
+        subtitle={t('page.playersSub', { n: players.length })}
         action={
           <button onClick={openCreate} className="btn-primary">
-            <Plus size={15} /> New Player
+            <Plus size={15} /> {t('page.newPlayer')}
           </button>
         }
       />
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-5">
-        <Combobox value={filter}            onChange={setFilter}            options={modeOptions}         placeholder="All Games"   style={{ width: 160 }} />
-        <Combobox value={teamFilter}        onChange={setTeamFilter}        options={teamOptions}         placeholder="All Teams"   style={{ width: 160 }} />
-        <Combobox value={nationalityFilter} onChange={setNationalityFilter} options={nationalityOptions}  placeholder="All Nations" style={{ width: 160 }} />
+        <Combobox value={filter}            onChange={setFilter}            options={modeOptions}         placeholder={t('common.allGames')}   style={{ width: 160 }} />
+        <Combobox value={teamFilter}        onChange={setTeamFilter}        options={teamOptions}         placeholder={t('common.allTeams')}   style={{ width: 160 }} />
+        <Combobox value={nationalityFilter} onChange={setNationalityFilter} options={nationalityOptions}  placeholder={t('common.allNations')} style={{ width: 160 }} />
         <AgeFilter ageMin={ageMin} ageMax={ageMax} onChange={(min, max) => { setAgeMin(min); setAgeMax(max) }} />
         <div className="flex items-center gap-2 flex-1 min-w-48 px-3 py-2 rounded-lg bg-bg-primary border border-bg-border focus-within:border-accent-green/40 transition-colors duration-150">
           <Search size={13} className="text-text-dim flex-shrink-0" />
           <input value={nameSearch} onChange={e => setNameSearch(e.target.value)}
-            placeholder="Search player..."
+            placeholder={t('players.searchPlayer')}
             className="bg-transparent font-body text-sm text-text-primary placeholder:text-text-dim outline-none flex-1 min-w-0" />
           {nameSearch && (
             <button onMouseDown={e => { e.preventDefault(); setNameSearch('') }} className="text-text-dim hover:text-text-muted transition-colors cursor-pointer">
@@ -392,9 +389,9 @@ export default function Players() {
         </div>
       </div>
 
-      <DataTable columns={columns} data={filtered} loading={loading} emptyMessage="No players found." highlightFn={highlightFn} sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+      <DataTable columns={columns} data={filtered} loading={loading} emptyMessage={t('players.none')} highlightFn={highlightFn} sortKey={sortKey} sortDir={sortDir} onSort={handleSort} onRowClick={(r) => navigate(`/players/${r.id}`)} />
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Player' : 'New Player'} width="max-w-2xl">
+      <Modal open={modal} onClose={() => setModal(false)} title={editing ? t('players.edit') : t('players.new')} width="max-w-2xl">
         <div className="space-y-3">
           {/* Player type */}
           <div className="flex gap-2">
@@ -412,48 +409,48 @@ export default function Players() {
 
           {/* Identity + team */}
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Full Name">
+            <Field label={t('col.fullName')}>
               <input className="input-field" value={form.fullName} onChange={e => set('fullName', e.target.value)} placeholder="John Smith" />
             </Field>
-            <Field label="Nickname">
+            <Field label={t('col.nickname')}>
               <input className="input-field" value={form.nickname} onChange={e => set('nickname', e.target.value)} placeholder="xX_Sniper_Xx" />
             </Field>
-            <Field label="Team">
+            <Field label={t('col.team')}>
               <select className="input-field" value={form.teamId} onChange={e => set('teamId', e.target.value)}>
-                <option value="">No team</option>
-                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                <option value="">{t('players.noTeamShort')}</option>
+                {teams.map(tm => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
               </select>
             </Field>
           </div>
 
           {/* Profile */}
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Nationality">
+            <Field label={t('col.nation')}>
               <input className="input-field" value={form.nationality} onChange={e => set('nationality', e.target.value)} placeholder="Portugal" />
             </Field>
-            <Field label="City">
+            <Field label={t('col.city')}>
               <input className="input-field" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Lisbon" />
             </Field>
-            <Field label="Date of Birth">
+            <Field label={t('players.dob')}>
               <input type="date" className="input-field" value={form.birthDate} onChange={e => set('birthDate', e.target.value)} />
             </Field>
           </div>
 
           {/* Record */}
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Matches">
+            <Field label={t('players.matches')}>
               <input type="number" className="input-field" value={form.matchesPlayed} onChange={e => set('matchesPlayed', e.target.value)} min="0" />
             </Field>
-            <Field label="Wins">
+            <Field label={t('players.wins')}>
               <input type="number" className="input-field" value={form.wins} onChange={e => set('wins', e.target.value)} min="0" />
             </Field>
-            <Field label="Losses">
+            <Field label={t('players.losses')}>
               <input type="number" className="input-field" value={form.losses} onChange={e => set('losses', e.target.value)} min="0" />
             </Field>
           </div>
 
           {/* Achievements */}
-          <Field label="Achievements (one per line)">
+          <Field label={t('players.achievements')}>
             <textarea className="input-field resize-none" rows={2}
               placeholder={"1st Place - Valorant Spring Cup 2026\nMVP - Season 3"}
               value={form.achievementsText}
@@ -463,54 +460,54 @@ export default function Players() {
           {/* Type-specific stats */}
           {form.playerType === 'FPS' && (
             <div className="grid grid-cols-4 gap-3 pt-2 border-t border-bg-border">
-              <Field label="Accuracy (%)">
+              <Field label={`${t('players.accuracy')} (%)`}>
                 <input type="number" step="0.1" className="input-field" value={form.accuracy} onChange={e => set('accuracy', e.target.value)} min="0" max="100" />
               </Field>
-              <Field label="KAST%">
+              <Field label={t('players.kast')}>
                 <input type="number" step="0.1" className="input-field" value={form.kast} onChange={e => set('kast', e.target.value)} min="0" max="100" placeholder="74.2" />
               </Field>
-              <Field label="ADR">
+              <Field label={t('players.adr')}>
                 <input type="number" step="0.1" className="input-field" value={form.adr} onChange={e => set('adr', e.target.value)} min="0" placeholder="152.3" />
               </Field>
-              <Field label="Headshots">
+              <Field label={t('players.headshots')}>
                 <input type="number" className="input-field" value={form.headshots} onChange={e => set('headshots', e.target.value)} min="0" />
               </Field>
             </div>
           )}
           {form.playerType === 'MOBA' && (
             <div className="grid grid-cols-4 gap-3 pt-2 border-t border-bg-border">
-              <Field label="Champion">
+              <Field label={t('players.mainChar')}>
                 <input className="input-field" value={form.mainCharacter} onChange={e => set('mainCharacter', e.target.value)} placeholder="Ahri" />
               </Field>
-              <Field label="Kills">
+              <Field label={t('players.kills')}>
                 <input type="number" className="input-field" value={form.kills} onChange={e => set('kills', e.target.value)} min="0" />
               </Field>
-              <Field label="Deaths">
+              <Field label={t('players.deaths')}>
                 <input type="number" className="input-field" value={form.deaths} onChange={e => set('deaths', e.target.value)} min="0" />
               </Field>
-              <Field label="Assists">
+              <Field label={t('players.assists')}>
                 <input type="number" className="input-field" value={form.mobaAssists} onChange={e => set('mobaAssists', e.target.value)} min="0" />
               </Field>
             </div>
           )}
           {form.playerType === 'EFOOTBALL' && (
             <div className="grid grid-cols-3 gap-3 pt-2 border-t border-bg-border">
-              <Field label="Position">
+              <Field label={t('players.mainPos')}>
                 <input className="input-field" value={form.mainPosition} onChange={e => set('mainPosition', e.target.value)} placeholder="ST, CM, GK..." />
               </Field>
-              <Field label="Goals Scored">
+              <Field label={t('players.goals')}>
                 <input type="number" className="input-field" value={form.goalsScored} onChange={e => set('goalsScored', e.target.value)} min="0" />
               </Field>
-              <Field label="Goals Saved (GK)">
+              <Field label={t('players.saves')}>
                 <input type="number" className="input-field" value={form.goalsSaved} onChange={e => set('goalsSaved', e.target.value)} min="0" />
               </Field>
-              <Field label="Assists">
+              <Field label={t('players.assists')}>
                 <input type="number" className="input-field" value={form.efbAssists} onChange={e => set('efbAssists', e.target.value)} min="0" />
               </Field>
-              <Field label="Shots on Target">
+              <Field label={t('players.shotsOnTarget')}>
                 <input type="number" className="input-field" value={form.shotsOnTarget} onChange={e => set('shotsOnTarget', e.target.value)} min="0" />
               </Field>
-              <Field label="Ball Recoveries">
+              <Field label={t('players.ballRecoveries')}>
                 <input type="number" className="input-field" value={form.ballRecoveries} onChange={e => set('ballRecoveries', e.target.value)} min="0" />
               </Field>
             </div>
@@ -518,41 +515,41 @@ export default function Players() {
 
           {form.playerType === 'RACING' && (
             <div className="grid grid-cols-4 gap-3 pt-2 border-t border-bg-border">
-              <Field label="Avg Position">
+              <Field label={t('players.avgPosition')}>
                 <input type="number" step="0.1" className="input-field" value={form.avgPosition} onChange={e => set('avgPosition', e.target.value)} min="1" placeholder="2.3" />
               </Field>
-              <Field label="Podiums">
+              <Field label={t('players.podiums')}>
                 <input type="number" className="input-field" value={form.podiums} onChange={e => set('podiums', e.target.value)} min="0" />
               </Field>
-              <Field label="Fastest Laps">
+              <Field label={t('players.fastestLaps')}>
                 <input type="number" className="input-field" value={form.fastestLaps} onChange={e => set('fastestLaps', e.target.value)} min="0" />
               </Field>
-              <Field label="DNFs">
+              <Field label={t('players.dnf')}>
                 <input type="number" className="input-field" value={form.dnf} onChange={e => set('dnf', e.target.value)} min="0" />
               </Field>
             </div>
           )}
           {form.playerType === 'BATTLE_ROYALE' && (
             <div className="grid grid-cols-4 gap-3 pt-2 border-t border-bg-border">
-              <Field label="Avg Placement">
+              <Field label={t('players.avgPlacement')}>
                 <input type="number" step="0.1" className="input-field" value={form.avgPlacement} onChange={e => set('avgPlacement', e.target.value)} min="1" placeholder="3.2" />
               </Field>
-              <Field label="Total Kills">
+              <Field label={t('players.totalKills')}>
                 <input type="number" className="input-field" value={form.kills} onChange={e => set('kills', e.target.value)} min="0" />
               </Field>
-              <Field label="Top-10 Rate (%)">
+              <Field label={`${t('players.top10')} (%)`}>
                 <input type="number" step="0.1" className="input-field" value={form.top10Rate} onChange={e => set('top10Rate', e.target.value)} min="0" max="100" placeholder="78.4" />
               </Field>
-              <Field label="Damage / Match">
+              <Field label={t('players.dmgPerMatch')}>
                 <input type="number" step="0.1" className="input-field" value={form.damagePerMatch} onChange={e => set('damagePerMatch', e.target.value)} min="0" placeholder="892" />
               </Field>
             </div>
           )}
 
           <div className="flex gap-3 justify-end pt-1">
-            <button onClick={() => setModal(false)} className="btn-ghost">Cancel</button>
+            <button onClick={() => setModal(false)} className="btn-ghost">{t('common.cancel')}</button>
             <button onClick={handleSave} disabled={saving} className="btn-primary">
-              {saving ? 'Saving...' : editing ? 'Save' : 'Create'}
+              {saving ? t('common.saving') : editing ? t('common.save') : t('common.create')}
             </button>
           </div>
         </div>

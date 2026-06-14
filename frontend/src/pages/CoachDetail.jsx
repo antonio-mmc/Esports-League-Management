@@ -8,14 +8,13 @@ import {
 import Badge from '../components/Badge'
 import Modal from '../components/Modal'
 import { useToast } from '../components/Toast'
+import { useT } from '../context/LanguageContext'
 import { coachApi, teamApi, tournamentApi } from '../services/api'
 import { teamEmoji } from '../utils/teamEmoji'
-import { TYPE_COLOR, TYPE_BADGE, TYPE_LABEL } from '../utils/gameMeta'
+import { TYPE_COLOR, TYPE_BADGE, TYPE_LABEL, STATUS_COLOR } from '../utils/gameMeta'
 import { winRate as computeWinRate } from '../utils/stats'
 
 const TYPE_ICON  = { FPS: Crosshair, MOBA: Sword,     EFOOTBALL: Footprints,  RACING: Car,      BATTLE_ROYALE: Skull }
-
-const STATUS_COLOR = { ACTIVE: 'green', UPCOMING: 'cyan', COMPLETED: 'gray', FINISHED: 'gray', PENDING: 'cyan' }
 
 const placementLabel = (pos) => {
   if (pos === 1) return { text: '1st', color: '#FBBF24' }
@@ -24,17 +23,7 @@ const placementLabel = (pos) => {
   return { text: `#${pos}`, color: '#64748B' }
 }
 
-const COUNTRY_CODE = {
-  'Portugal': 'PT', 'Spain': 'ES', 'Japan': 'JP', 'Russia': 'RU',
-  'Ghana': 'GH', 'Denmark': 'DK', 'Sweden': 'SE', 'Italy': 'IT',
-  'Egypt': 'EG', 'France': 'FR', 'Brazil': 'BR', 'Germany': 'DE',
-  'South Korea': 'KR', 'Czech Republic': 'CZ', 'Senegal': 'SN',
-  'Ireland': 'IE', 'Croatia': 'HR', 'Lebanon': 'LB', 'Colombia': 'CO',
-  'Norway': 'NO', 'Pakistan': 'PK', 'USA': 'US', 'United Kingdom': 'GB',
-  'Mexico': 'MX', 'Morocco': 'MA', 'Netherlands': 'NL', 'Argentina': 'AR',
-  'India': 'IN', 'Nigeria': 'NG', 'Ukraine': 'UA', 'China': 'CN',
-  'Bangladesh': 'BD',
-}
+import { COUNTRY_CODE } from '../utils/countries'
 
 function FlagIcon({ nationality, size = 20 }) {
   const code = COUNTRY_CODE[nationality]
@@ -113,6 +102,7 @@ export default function CoachDetail() {
   const achBtnRef = useRef(null)
   const achPopRef = useRef(null)
   const toast = useToast()
+  const { t } = useT()
 
   useEffect(() => {
     if (!showAchievements) return
@@ -151,6 +141,8 @@ export default function CoachDetail() {
     } catch(e) { console.error(e) }
     finally { setLoad(false) }
   }
+  // Reload whenever the route id changes; the loading flag set inside load() is expected.
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
   useEffect(() => { load() }, [id])
 
   useEffect(() => {
@@ -193,9 +185,9 @@ export default function CoachDetail() {
       }
       await coachApi.update(coach.id, payload)
       setModal(false)
-      toast('Coach updated.', 'success')
+      toast(t('coaches.updated'), 'success')
       load()
-    } catch(e) { toast(e?.response?.data?.message || 'Failed to save.', 'error') }
+    } catch(e) { toast(e?.response?.data?.error || e?.response?.data?.message || t('coaches.saveFail'), 'error') }
     finally { setSaving(false) }
   }
 
@@ -212,8 +204,8 @@ export default function CoachDetail() {
   if (!coach) {
     return (
       <div className="text-center py-32">
-        <p className="font-body text-text-muted">Coach not found.</p>
-        <Link to="/coaches" className="btn-ghost mt-4 inline-flex">Back</Link>
+        <p className="font-body text-text-muted">{t('dt.coachNotFound')}</p>
+        <Link to="/coaches" className="btn-ghost mt-4 inline-flex">{t('common.back', { target: t('nav.coaches') })}</Link>
       </div>
     )
   }
@@ -235,7 +227,6 @@ export default function CoachDetail() {
 
   const wins   = team?.wins   || 0
   const losses = team?.losses || 0
-  const points = team?.points || 0
   const total  = wins + losses
   const winRate = computeWinRate(wins, losses)
   const barColor = winRate >= 75 ? '#3B82F6'
@@ -254,21 +245,22 @@ export default function CoachDetail() {
     <div className="animate-fade-in">
       <Link to="/coaches" className="inline-flex items-center gap-2 text-text-muted hover:text-text-primary font-body text-sm mb-6 transition-colors cursor-pointer group">
         <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
-        Back to Coaches
+        {t('common.back', { target: t('nav.coaches') })}
       </Link>
 
       {/* Hero card */}
-      <div className="glass-card p-6 mb-4" style={{ borderColor: `${color}33`, boxShadow: `0 0 40px ${color}0d` }}>
+      <div className="glass-card p-6 mb-4 relative overflow-hidden">
+        <span className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: color }} />
         <div className="flex items-start justify-between flex-wrap gap-4">
           {/* Identity */}
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
-              style={{ background: `${color}1a`, border: `1px solid ${color}4d`, boxShadow: `0 0 28px ${color}33` }}>
+            <div className="w-16 h-16 rounded flex items-center justify-center flex-shrink-0"
+              style={{ background: `${color}14`, border: `1px solid ${color}40` }}>
               <Icon size={30} style={{ color }} />
             </div>
             <div>
-              <div className="flex items-center gap-2.5 mb-0.5">
-                <h1 className="font-display text-2xl text-text-primary tracking-wide">{coach.name}</h1>
+              <div className="flex items-center gap-2.5 mb-1">
+                <h1 className="display-xl text-3xl text-text-primary">{coach.name}</h1>
                 {mode && <Badge variant={TYPE_BADGE[mode] || 'gray'}>{TYPE_LABEL[mode] || mode}</Badge>}
               </div>
               <p className="font-body text-xs text-text-dim">{coach.email}</p>
@@ -285,8 +277,8 @@ export default function CoachDetail() {
             <div className="flex gap-3 flex-wrap">
               {team && (
                 <>
-                  <StatPill label="Matches"  value={total}           accent={color} />
-                  <StatPill label="Win Rate" value={`${winRate}%`}   accent={barColor} />
+                  <StatPill label={t('players.matches')}  value={total}           accent={color} />
+                  <StatPill label={t('dt.winRate')} value={`${winRate}%`}   accent={barColor} />
                 </>
               )}
               <button ref={achBtnRef} onClick={toggleAchievements}
@@ -297,7 +289,7 @@ export default function CoachDetail() {
                 }`}>
                 <span className="font-display text-xl text-yellow-400">{coach.achievements?.length || 0}</span>
                 <span className="font-body text-xs text-text-dim uppercase tracking-wider mt-0.5 flex items-center gap-1">
-                  <Trophy size={9} /> Trophies
+                  <Trophy size={9} /> {t('dt.trophies')}
                 </span>
               </button>
             </div>
@@ -328,11 +320,11 @@ export default function CoachDetail() {
 
         {/* Coach Profile */}
         <div className="glass-card p-5" style={{ borderColor: `${color}22` }}>
-          <h2 className="font-display text-xs text-text-muted uppercase tracking-widest mb-2">Coach Profile</h2>
+          <h2 className="font-display text-xs text-text-muted uppercase tracking-widest mb-2">{t('dt.profile')}</h2>
           {hasProfile ? (
             <div>
               {coach.nationality && (
-                <ProfileRow icon={null} label="Nationality">
+                <ProfileRow icon={null} label={t('col.nation')}>
                   <div className="flex items-center gap-2">
                     <FlagIcon nationality={coach.nationality} size={22} />
                     <span className="font-body text-sm text-text-primary">{coach.nationality}</span>
@@ -340,12 +332,12 @@ export default function CoachDetail() {
                 </ProfileRow>
               )}
               {coach.city && (
-                <ProfileRow icon={MapPin} label="City">
+                <ProfileRow icon={MapPin} label={t('col.city')}>
                   <span className="font-body text-sm text-text-primary">{coach.city}</span>
                 </ProfileRow>
               )}
               {coach.birthDate && (
-                <ProfileRow icon={Calendar} label="Date of Birth">
+                <ProfileRow icon={Calendar} label={t('players.dob')}>
                   <div>
                     <span className="font-body text-sm text-text-primary">{formatDate(coach.birthDate)}</span>
                     {getAge(coach.birthDate) != null && (
@@ -357,7 +349,7 @@ export default function CoachDetail() {
                 </ProfileRow>
               )}
               {coach.team && (
-                <ProfileRow icon={Shield} label="Team">
+                <ProfileRow icon={Shield} label={t('col.team')}>
                   <Link to={`/teams/${coach.team.id}`} className="font-body text-sm text-accent-green hover:underline inline-flex items-center gap-1.5">
                     <span>{teamEmoji(coach.team.name)}</span>{coach.team.name}
                   </Link>
@@ -367,7 +359,7 @@ export default function CoachDetail() {
           ) : (
             <div className="flex flex-col items-center justify-center py-8 gap-2">
               <UserCheck size={28} className="text-text-dim" />
-              <p className="font-body text-xs text-text-dim text-center">No profile details yet.<br />Click edit to add them.</p>
+              <p className="font-body text-xs text-text-dim text-center">{t('dt.noProfile')}<br />{t('dt.clickEdit')}</p>
             </div>
           )}
         </div>
@@ -376,7 +368,7 @@ export default function CoachDetail() {
         <div className="glass-card p-5">
           <div className="flex items-center gap-2 mb-4">
             <Trophy size={13} className="text-text-muted" />
-            <h2 className="font-display text-xs text-text-muted uppercase tracking-widest">Tournament History</h2>
+            <h2 className="font-display text-xs text-text-muted uppercase tracking-widest">{t('dt.tournamentHistory')}</h2>
           </div>
           {tournaments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 gap-2">
@@ -450,7 +442,7 @@ export default function CoachDetail() {
           ) : (
             <div className="flex flex-col items-center py-3 gap-2">
               <Star size={20} className="text-text-dim" />
-              <p className="font-body text-xs text-text-dim text-center">No achievements yet<br />Click edit to add</p>
+              <p className="font-body text-xs text-text-dim text-center">{t('dt.noAchievements')}<br />{t('dt.clickEdit')}</p>
             </div>
           )}
         </div>,
@@ -458,37 +450,37 @@ export default function CoachDetail() {
       )}
 
       {/* Edit modal */}
-      <Modal open={modal} onClose={() => setModal(false)} title="Edit Coach" width="max-w-xl">
+      <Modal open={modal} onClose={() => setModal(false)} title={t('coaches.edit')} width="max-w-xl">
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Name">
+            <Field label={t('col.name')}>
               <input className="input-field" value={form.name} onChange={e => set('name', e.target.value)} />
             </Field>
-            <Field label="Email">
+            <Field label={t('col.email')}>
               <input type="email" className="input-field" value={form.email} onChange={e => set('email', e.target.value)} />
             </Field>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Nationality">
+            <Field label={t('col.nation')}>
               <input className="input-field" value={form.nationality} onChange={e => set('nationality', e.target.value)} placeholder="Portugal" />
             </Field>
-            <Field label="City">
+            <Field label={t('col.city')}>
               <input className="input-field" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Lisbon" />
             </Field>
-            <Field label="Date of Birth">
+            <Field label={t('players.dob')}>
               <input type="date" className="input-field" value={form.birthDate} onChange={e => set('birthDate', e.target.value)} />
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Team">
+            <Field label={t('col.team')}>
               <select className="input-field" value={form.teamId} onChange={e => set('teamId', e.target.value)}>
-                <option value="">No team</option>
-                {teams.map(t => <option key={t.id} value={t.id}>{teamEmoji(t.name)} {t.name}</option>)}
+                <option value="">{t('players.noTeamShort')}</option>
+                {teams.map(tm => <option key={tm.id} value={tm.id}>{teamEmoji(tm.name)} {tm.name}</option>)}
               </select>
             </Field>
-            <Field label="Mode">
+            <Field label={t('col.mode')}>
               <select className="input-field" value={form.specialization} onChange={e => set('specialization', e.target.value)}>
-                <option value="">None</option>
+                <option value="">{t('ui.none')}</option>
                 <option value="FPS">FPS</option>
                 <option value="MOBA">MOBA</option>
                 <option value="EFOOTBALL">eFootball</option>
@@ -497,7 +489,7 @@ export default function CoachDetail() {
               </select>
             </Field>
           </div>
-          <Field label="Achievements (one per line)">
+          <Field label={t('players.achievements')}>
             <textarea className="input-field resize-none" rows={3}
               placeholder={"FPS Coach of the Year 2025\nLed Team Nexus to 2nd place — Valorant Cup"}
               value={form.achievementsText}
@@ -505,9 +497,9 @@ export default function CoachDetail() {
           </Field>
 
           <div className="flex gap-3 justify-end pt-1">
-            <button onClick={() => setModal(false)} className="btn-ghost">Cancel</button>
+            <button onClick={() => setModal(false)} className="btn-ghost">{t('common.cancel')}</button>
             <button onClick={handleSave} disabled={saving} className="btn-primary">
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? t('common.saving') : t('common.save')}
             </button>
           </div>
         </div>

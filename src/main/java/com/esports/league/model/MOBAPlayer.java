@@ -14,10 +14,10 @@ public class MOBAPlayer extends Player {
 
     public MOBAPlayer() {}
 
-    public MOBAPlayer(String fullName, String nickname, String password,
+    public MOBAPlayer(String fullName, String nickname,
                       int matchesPlayed, int wins, int losses,
                       String mainCharacter, int kills, int deaths, int assists) {
-        super(fullName, nickname, password, matchesPlayed, wins, losses);
+        super(fullName, nickname, matchesPlayed, wins, losses);
         this.mainCharacter = mainCharacter;
         this.kills = kills;
         this.deaths = deaths;

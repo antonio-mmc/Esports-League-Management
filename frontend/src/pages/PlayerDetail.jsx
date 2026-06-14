@@ -8,9 +8,10 @@ import {
 import Badge from '../components/Badge'
 import Modal from '../components/Modal'
 import { useToast } from '../components/Toast'
+import { useT } from '../context/LanguageContext'
 import { playerApi, teamApi } from '../services/api'
 import { teamEmoji } from '../utils/teamEmoji'
-import { TYPE_COLOR, TYPE_BADGE, TYPE_LABEL } from '../utils/gameMeta'
+import { TYPE_COLOR, TYPE_BADGE, TYPE_LABEL, STATUS_COLOR } from '../utils/gameMeta'
 import { winRate as computeWinRate } from '../utils/stats'
 
 const TYPE_ICON  = { FPS: Crosshair, MOBA: Sword,     EFOOTBALL: Footprints,  RACING: Car,      BATTLE_ROYALE: Skull   }
@@ -24,19 +25,8 @@ const TYPE_META = {
 }
 
 const GAME_COLOR   = { FPS: 'cyan', MOBA: 'purple', eFootball: 'green', Racing: 'orange', 'Battle Royale': 'red' }
-const STATUS_COLOR = { ACTIVE: 'green', UPCOMING: 'cyan', COMPLETED: 'gray' }
 
-const COUNTRY_CODE = {
-  'Portugal': 'PT', 'Spain': 'ES', 'Japan': 'JP', 'Russia': 'RU',
-  'Ghana': 'GH', 'Denmark': 'DK', 'Sweden': 'SE', 'Italy': 'IT',
-  'Egypt': 'EG', 'France': 'FR', 'Brazil': 'BR', 'Germany': 'DE',
-  'South Korea': 'KR', 'Czech Republic': 'CZ', 'Senegal': 'SN',
-  'Ireland': 'IE', 'Croatia': 'HR', 'Lebanon': 'LB', 'Colombia': 'CO',
-  'Norway': 'NO', 'Pakistan': 'PK', 'USA': 'US',
-  'Mexico': 'MX', 'Morocco': 'MA', 'Netherlands': 'NL', 'Argentina': 'AR',
-  'India': 'IN', 'Nigeria': 'NG', 'Ukraine': 'UA', 'China': 'CN',
-  'Bangladesh': 'BD',
-}
+import { COUNTRY_CODE } from '../utils/countries'
 function FlagIcon({ nationality, size = 20 }) {
   const code = COUNTRY_CODE[nationality]
   if (!code) return null
@@ -145,6 +135,7 @@ export default function PlayerDetail() {
   const achBtnRef = useRef(null)
   const achPopRef = useRef(null)
   const toast = useToast()
+  const { t } = useT()
 
   useEffect(() => {
     if (!showAchievements) return
@@ -183,6 +174,8 @@ export default function PlayerDetail() {
     } catch(e) { console.error(e) }
     finally { setLoad(false) }
   }
+  // Reload whenever the route id changes; the loading flag set inside load() is expected.
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
   useEffect(() => { load() }, [id])
 
   const openEdit = () => {
@@ -207,9 +200,9 @@ export default function PlayerDetail() {
     try {
       await playerApi.update(player.id, buildPayload(form))
       setModal(false)
-      toast('Player updated.', 'success')
+      toast(t('players.updated'), 'success')
       load()
-    } catch(e) { toast(e?.response?.data?.message || 'Failed to save.', 'error') }
+    } catch(e) { toast(e?.response?.data?.error || e?.response?.data?.message || t('players.saveFail'), 'error') }
     finally { setSaving(false) }
   }
 
@@ -226,8 +219,8 @@ export default function PlayerDetail() {
   if (!player) {
     return (
       <div className="text-center py-32">
-        <p className="font-body text-text-muted">Player not found.</p>
-        <Link to="/players" className="btn-ghost mt-4 inline-flex">Back</Link>
+        <p className="font-body text-text-muted">{t('dt.playerNotFound')}</p>
+        <Link to="/players" className="btn-ghost mt-4 inline-flex">{t('common.back', { target: t('nav.players') })}</Link>
       </div>
     )
   }
@@ -248,21 +241,22 @@ export default function PlayerDetail() {
     <div className="animate-fade-in">
       <Link to="/players" className="inline-flex items-center gap-2 text-text-muted hover:text-text-primary font-body text-sm mb-6 transition-colors cursor-pointer group">
         <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
-        Back to Players
+        {t('common.back', { target: t('nav.players') })}
       </Link>
 
       {/* ── Hero card ───────────────────────────────────────────────────── */}
-      <div className="glass-card p-6 mb-4" style={{ borderColor: `${color}33`, boxShadow: `0 0 40px ${color}0d` }}>
+      <div className="glass-card p-6 mb-4 relative overflow-hidden">
+        <span className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: color }} />
         <div className="flex items-start justify-between flex-wrap gap-4">
           {/* Identity */}
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
-              style={{ background: `${color}1a`, border: `1px solid ${color}4d`, boxShadow: `0 0 28px ${color}33` }}>
+            <div className="w-16 h-16 rounded flex items-center justify-center flex-shrink-0"
+              style={{ background: `${color}14`, border: `1px solid ${color}40` }}>
               <Icon size={30} style={{ color }} />
             </div>
             <div>
-              <div className="flex items-center gap-2.5 mb-0.5">
-                <h1 className="font-display text-2xl text-text-primary tracking-wide">{player.nickname}</h1>
+              <div className="flex items-center gap-2.5 mb-1">
+                <h1 className="display-xl text-3xl text-text-primary">{player.nickname}</h1>
                 <Badge variant={TYPE_BADGE[player.playerType] || 'gray'}>{TYPE_LABEL[player.playerType] || player.playerType}</Badge>
               </div>
               <p className="font-body text-sm text-text-muted">{player.fullName}</p>
@@ -277,8 +271,8 @@ export default function PlayerDetail() {
           {/* Stats + edit */}
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex gap-3 flex-wrap">
-              <StatPill label="Matches"  value={player.matchesPlayed} accent={color}   />
-              <StatPill label="Win Rate" value={`${winRate}%`}        accent={winRateColor} />
+              <StatPill label={t('players.matches')}  value={player.matchesPlayed} accent={color}   />
+              <StatPill label={t('dt.winRate')} value={`${winRate}%`}        accent={winRateColor} />
 
               {/* Achievements pill */}
               <button ref={achBtnRef} onClick={toggleAchievements}
@@ -289,7 +283,7 @@ export default function PlayerDetail() {
                 }`}>
                 <span className="font-display text-xl text-yellow-400">{player.achievements?.length || 0}</span>
                 <span className="font-body text-xs text-text-dim uppercase tracking-wider mt-0.5 flex items-center gap-1">
-                  <Trophy size={9} /> Trophies
+                  <Trophy size={9} /> {t('dt.trophies')}
                 </span>
               </button>
             </div>
@@ -321,23 +315,23 @@ export default function PlayerDetail() {
         <div className="col-span-2">
           {player.playerType === 'FPS' && (
             <div className="glass-card p-5 h-full">
-              <h2 className="font-display text-xs text-text-muted uppercase tracking-widest mb-4">FPS Performance</h2>
-              <StatRow icon={Target} label="Accuracy"        value={`${(player.accuracy || 0).toFixed(1)}%`} large />
-              <StatRow icon={Zap}    label="KAST%"          value={player.kast != null ? `${player.kast.toFixed(1)}%` : '—'} large />
-              <StatRow icon={Hash}   label="ADR"            value={player.adr  != null ? player.adr.toFixed(1) : '—'} />
-              <StatRow icon={Zap}    label="Total Headshots" value={player.headshots} />
-              <StatRow icon={Hash}   label="HS / Match"     value={player.matchesPlayed > 0 ? (player.headshots / player.matchesPlayed).toFixed(1) : '—'} />
+              <h2 className="font-display text-xs text-text-muted uppercase tracking-widest mb-4">FPS {t('dt.performance')}</h2>
+              <StatRow icon={Target} label={t('players.accuracy')}        value={`${(player.accuracy || 0).toFixed(1)}%`} large />
+              <StatRow icon={Zap}    label={t('players.kast')}          value={player.kast != null ? `${player.kast.toFixed(1)}%` : '—'} large />
+              <StatRow icon={Hash}   label={t('players.adr')}            value={player.adr  != null ? player.adr.toFixed(1) : '—'} />
+              <StatRow icon={Zap}    label={t('dt.totalHeadshots')} value={player.headshots} />
+              <StatRow icon={Hash}   label={t('dt.hsMatch')}     value={player.matchesPlayed > 0 ? (player.headshots / player.matchesPlayed).toFixed(1) : '—'} />
             </div>
           )}
           {player.playerType === 'MOBA' && (
             <div className="glass-card p-5 h-full">
-              <h2 className="font-display text-xs text-text-muted uppercase tracking-widest mb-4">MOBA Performance</h2>
-              <StatRow icon={Sword}  label="Main Champion" value={player.mainCharacter || '—'} large />
-              <StatRow icon={Zap}    label="Kills"    value={player.kills} />
-              <StatRow icon={Skull}  label="Deaths"   value={player.deaths} />
-              <StatRow icon={Target} label="Assists"  value={player.mobaAssists} />
+              <h2 className="font-display text-xs text-text-muted uppercase tracking-widest mb-4">MOBA {t('dt.performance')}</h2>
+              <StatRow icon={Sword}  label={t('dt.mainChampion')} value={player.mainCharacter || '—'} large />
+              <StatRow icon={Zap}    label={t('players.kills')}    value={player.kills} />
+              <StatRow icon={Skull}  label={t('players.deaths')}   value={player.deaths} />
+              <StatRow icon={Target} label={t('players.assists')}  value={player.mobaAssists} />
               {(player.kills != null && player.deaths) && (
-                <StatRow icon={Hash} label="KDA Ratio"
+                <StatRow icon={Hash} label={t('dt.kda')}
                   value={((player.kills + player.mobaAssists) / Math.max(player.deaths, 1)).toFixed(2)} />
               )}
             </div>
@@ -346,20 +340,20 @@ export default function PlayerDetail() {
             const isGK = ['gk', 'goalkeeper'].includes((player.mainPosition || '').toLowerCase().trim())
             return (
               <div className="glass-card p-5 h-full">
-                <h2 className="font-display text-xs text-text-muted uppercase tracking-widest mb-4">eFootball Performance</h2>
-                <StatRow icon={Footprints} label="Main Position" value={player.mainPosition || '—'} large />
+                <h2 className="font-display text-xs text-text-muted uppercase tracking-widest mb-4">eFootball {t('dt.performance')}</h2>
+                <StatRow icon={Footprints} label={t('players.mainPos')} value={player.mainPosition || '—'} large />
                 {isGK ? (
                   <>
-                    <StatRow icon={Target} label="Goals Saved"      value={player.goalsSaved} />
-                    <StatRow icon={Hash}   label="Ball Recoveries"  value={player.ballRecoveries} />
-                    <StatRow icon={Zap}    label="Assists"           value={player.efbAssists} />
+                    <StatRow icon={Target} label={t('players.saves')}      value={player.goalsSaved} />
+                    <StatRow icon={Hash}   label={t('players.ballRecoveries')}  value={player.ballRecoveries} />
+                    <StatRow icon={Zap}    label={t('players.assists')}           value={player.efbAssists} />
                   </>
                 ) : (
                   <>
-                    <StatRow icon={Target} label="Goals Scored"     value={player.goalsScored} />
-                    <StatRow icon={Hash}   label="Shots on Target"  value={player.shotsOnTarget} />
-                    <StatRow icon={Zap}    label="Ball Recoveries"  value={player.ballRecoveries} />
-                    <StatRow icon={Star}   label="Assists"          value={player.efbAssists} />
+                    <StatRow icon={Target} label={t('players.goals')}     value={player.goalsScored} />
+                    <StatRow icon={Hash}   label={t('players.shotsOnTarget')}  value={player.shotsOnTarget} />
+                    <StatRow icon={Zap}    label={t('players.ballRecoveries')}  value={player.ballRecoveries} />
+                    <StatRow icon={Star}   label={t('players.assists')}          value={player.efbAssists} />
                   </>
                 )}
               </div>
@@ -367,26 +361,26 @@ export default function PlayerDetail() {
           })()}
           {player.playerType === 'RACING' && (
             <div className="glass-card p-5 h-full">
-              <h2 className="font-display text-xs text-text-muted uppercase tracking-widest mb-4">Racing Performance</h2>
-              <StatRow icon={Target} label="Avg. Position"   value={player.avgPosition != null ? player.avgPosition.toFixed(1) : '—'} large />
-              <StatRow icon={Trophy} label="Podiums"         value={player.podiums} />
-              <StatRow icon={Zap}    label="Fastest Laps"    value={player.fastestLaps} />
-              <StatRow icon={Hash}   label="DNFs"            value={player.dnf} />
+              <h2 className="font-display text-xs text-text-muted uppercase tracking-widest mb-4">Racing {t('dt.performance')}</h2>
+              <StatRow icon={Target} label={t('players.avgPosition')}   value={player.avgPosition != null ? player.avgPosition.toFixed(1) : '—'} large />
+              <StatRow icon={Trophy} label={t('players.podiums')}         value={player.podiums} />
+              <StatRow icon={Zap}    label={t('players.fastestLaps')}    value={player.fastestLaps} />
+              <StatRow icon={Hash}   label={t('players.dnf')}            value={player.dnf} />
               {player.matchesPlayed > 0 && (
-                <StatRow icon={Star} label="Podium Rate"
+                <StatRow icon={Star} label={t('dt.podiumRate')}
                   value={`${Math.round((player.podiums / (player.matchesPlayed * 3)) * 100)}%`} />
               )}
             </div>
           )}
           {player.playerType === 'BATTLE_ROYALE' && (
             <div className="glass-card p-5 h-full">
-              <h2 className="font-display text-xs text-text-muted uppercase tracking-widest mb-4">Battle Royale Performance</h2>
-              <StatRow icon={Target} label="Avg. Placement"    value={player.avgPlacement != null ? player.avgPlacement.toFixed(1) : '—'} large />
-              <StatRow icon={Zap}    label="Top-10 Rate"       value={player.top10Rate != null ? `${player.top10Rate.toFixed(1)}%` : '—'} />
-              <StatRow icon={Hash}   label="Total Kills"       value={player.kills} />
-              <StatRow icon={Star}   label="Damage / Match"    value={player.damagePerMatch != null ? player.damagePerMatch.toFixed(0) : '—'} />
+              <h2 className="font-display text-xs text-text-muted uppercase tracking-widest mb-4">Battle Royale {t('dt.performance')}</h2>
+              <StatRow icon={Target} label={t('players.avgPlacement')}    value={player.avgPlacement != null ? player.avgPlacement.toFixed(1) : '—'} large />
+              <StatRow icon={Zap}    label={t('players.top10')}       value={player.top10Rate != null ? `${player.top10Rate.toFixed(1)}%` : '—'} />
+              <StatRow icon={Hash}   label={t('players.totalKills')}       value={player.kills} />
+              <StatRow icon={Star}   label={t('players.dmgPerMatch')}    value={player.damagePerMatch != null ? player.damagePerMatch.toFixed(0) : '—'} />
               {player.matchesPlayed > 0 && (
-                <StatRow icon={Crosshair} label="Kills / Match"
+                <StatRow icon={Crosshair} label={t('dt.killsMatch')}
                   value={((player.kills || 0) / player.matchesPlayed).toFixed(1)} />
               )}
             </div>
@@ -401,12 +395,12 @@ export default function PlayerDetail() {
         {/* Player profile card — 1/3 */}
         <div className="col-span-1">
           <div className="glass-card p-5 h-full" style={{ borderColor: `${color}22` }}>
-            <h2 className="font-display text-xs text-text-muted uppercase tracking-widest mb-2">Player Profile</h2>
+            <h2 className="font-display text-xs text-text-muted uppercase tracking-widest mb-2">{t('nav.players')}</h2>
 
             {hasProfile ? (
               <div>
                 {player.nationality && (
-                  <ProfileRow icon={null} label="Nationality">
+                  <ProfileRow icon={null} label={t('col.nation')}>
                     <div className="flex items-center gap-2">
                       <FlagIcon nationality={player.nationality} size={22} />
                       <span className="font-body text-sm text-text-primary">{player.nationality}</span>
@@ -414,12 +408,12 @@ export default function PlayerDetail() {
                   </ProfileRow>
                 )}
                 {player.city && (
-                  <ProfileRow icon={MapPin} label="City">
+                  <ProfileRow icon={MapPin} label={t('col.city')}>
                     <span className="font-body text-sm text-text-primary">{player.city}</span>
                   </ProfileRow>
                 )}
                 {player.birthDate && (
-                  <ProfileRow icon={Calendar} label="Date of Birth">
+                  <ProfileRow icon={Calendar} label={t('players.dob')}>
                     <div>
                       <span className="font-body text-sm text-text-primary">{formatDate(player.birthDate)}</span>
                       {player.age != null && (
@@ -431,7 +425,7 @@ export default function PlayerDetail() {
                   </ProfileRow>
                 )}
                 {player.team && (
-                  <ProfileRow icon={Users} label="Team">
+                  <ProfileRow icon={Users} label={t('col.team')}>
                     <Link to={`/teams/${player.team.id}`}
                       className="font-body text-sm text-accent-green hover:underline inline-flex items-center gap-1.5">
                       <span>{teamEmoji(player.team.name)}</span>{player.team.name}
@@ -442,7 +436,7 @@ export default function PlayerDetail() {
             ) : (
               <div className="flex flex-col items-center justify-center py-8 gap-2">
                 <Users size={28} className="text-text-dim" />
-                <p className="font-body text-xs text-text-dim text-center">No profile details yet.<br />Click edit to add them.</p>
+                <p className="font-body text-xs text-text-dim text-center">{t('dt.noProfile')}<br />{t('dt.clickEdit')}</p>
               </div>
             )}
           </div>
@@ -454,7 +448,7 @@ export default function PlayerDetail() {
         <div className="glass-card p-5">
           <div className="flex items-center gap-2 mb-4">
             <Trophy size={13} className="text-text-muted" />
-            <h2 className="font-display text-xs text-text-muted uppercase tracking-widest">Tournament History</h2>
+            <h2 className="font-display text-xs text-text-muted uppercase tracking-widest">{t('dt.tournamentHistory')}</h2>
           </div>
           <div className="space-y-2">
             {[...teamDetail.tournaments]
@@ -508,7 +502,7 @@ export default function PlayerDetail() {
           ) : (
             <div className="flex flex-col items-center py-3 gap-2">
               <Star size={20} className="text-text-dim" />
-              <p className="font-body text-xs text-text-dim text-center">No achievements yet<br />Click edit to add</p>
+              <p className="font-body text-xs text-text-dim text-center">{t('dt.noAchievements')}<br />{t('dt.clickEdit')}</p>
             </div>
           )}
         </div>,
@@ -516,7 +510,7 @@ export default function PlayerDetail() {
       )}
 
       {/* ── Edit modal ──────────────────────────────────────────────────── */}
-      <Modal open={modal} onClose={() => setModal(false)} title="Edit Player" width="max-w-2xl">
+      <Modal open={modal} onClose={() => setModal(false)} title={t('players.edit')} width="max-w-2xl">
         <div className="space-y-3">
           {/* Player type */}
           <div className="flex gap-2">
@@ -534,48 +528,48 @@ export default function PlayerDetail() {
 
           {/* Identity + team */}
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Full Name">
+            <Field label={t('col.fullName')}>
               <input className="input-field" value={form.fullName} onChange={e => set('fullName', e.target.value)} />
             </Field>
-            <Field label="Nickname">
+            <Field label={t('col.nickname')}>
               <input className="input-field" value={form.nickname} onChange={e => set('nickname', e.target.value)} />
             </Field>
-            <Field label="Team">
+            <Field label={t('col.team')}>
               <select className="input-field" value={form.teamId} onChange={e => set('teamId', e.target.value)}>
-                <option value="">No team</option>
-                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                <option value="">{t('players.noTeamShort')}</option>
+                {teams.map(tm => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
               </select>
             </Field>
           </div>
 
           {/* Profile */}
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Nationality">
+            <Field label={t('col.nation')}>
               <input className="input-field" value={form.nationality} onChange={e => set('nationality', e.target.value)} placeholder="Portugal" />
             </Field>
-            <Field label="City">
+            <Field label={t('col.city')}>
               <input className="input-field" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Lisbon" />
             </Field>
-            <Field label="Date of Birth">
+            <Field label={t('players.dob')}>
               <input type="date" className="input-field" value={form.birthDate} onChange={e => set('birthDate', e.target.value)} />
             </Field>
           </div>
 
           {/* Record */}
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Matches">
+            <Field label={t('players.matches')}>
               <input type="number" className="input-field" value={form.matchesPlayed} onChange={e => set('matchesPlayed', e.target.value)} min="0" />
             </Field>
-            <Field label="Wins">
+            <Field label={t('players.wins')}>
               <input type="number" className="input-field" value={form.wins} onChange={e => set('wins', e.target.value)} min="0" />
             </Field>
-            <Field label="Losses">
+            <Field label={t('players.losses')}>
               <input type="number" className="input-field" value={form.losses} onChange={e => set('losses', e.target.value)} min="0" />
             </Field>
           </div>
 
           {/* Achievements */}
-          <Field label="Achievements (one per line)">
+          <Field label={t('players.achievements')}>
             <textarea className="input-field resize-none" rows={2}
               placeholder={"1st Place - Valorant Spring Cup 2026\nMVP - Season 3"}
               value={form.achievementsText}
@@ -585,54 +579,54 @@ export default function PlayerDetail() {
           {/* Type-specific stats */}
           {form.playerType === 'FPS' && (
             <div className="grid grid-cols-4 gap-3 pt-2 border-t border-bg-border">
-              <Field label="Accuracy (%)">
+              <Field label={`${t('players.accuracy')} (%)`}>
                 <input type="number" step="0.1" className="input-field" value={form.accuracy} onChange={e => set('accuracy', e.target.value)} min="0" max="100" />
               </Field>
-              <Field label="KAST%">
+              <Field label={t('players.kast')}>
                 <input type="number" step="0.1" className="input-field" value={form.kast} onChange={e => set('kast', e.target.value)} min="0" max="100" placeholder="74.2" />
               </Field>
-              <Field label="ADR">
+              <Field label={t('players.adr')}>
                 <input type="number" step="0.1" className="input-field" value={form.adr} onChange={e => set('adr', e.target.value)} min="0" placeholder="152.3" />
               </Field>
-              <Field label="Headshots">
+              <Field label={t('players.headshots')}>
                 <input type="number" className="input-field" value={form.headshots} onChange={e => set('headshots', e.target.value)} min="0" />
               </Field>
             </div>
           )}
           {form.playerType === 'MOBA' && (
             <div className="grid grid-cols-4 gap-3 pt-2 border-t border-bg-border">
-              <Field label="Champion">
+              <Field label={t('players.mainChar')}>
                 <input className="input-field" value={form.mainCharacter} onChange={e => set('mainCharacter', e.target.value)} />
               </Field>
-              <Field label="Kills">
+              <Field label={t('players.kills')}>
                 <input type="number" className="input-field" value={form.kills} onChange={e => set('kills', e.target.value)} min="0" />
               </Field>
-              <Field label="Deaths">
+              <Field label={t('players.deaths')}>
                 <input type="number" className="input-field" value={form.deaths} onChange={e => set('deaths', e.target.value)} min="0" />
               </Field>
-              <Field label="Assists">
+              <Field label={t('players.assists')}>
                 <input type="number" className="input-field" value={form.mobaAssists} onChange={e => set('mobaAssists', e.target.value)} min="0" />
               </Field>
             </div>
           )}
           {form.playerType === 'EFOOTBALL' && (
             <div className="grid grid-cols-3 gap-3 pt-2 border-t border-bg-border">
-              <Field label="Position">
+              <Field label={t('players.mainPos')}>
                 <input className="input-field" value={form.mainPosition} onChange={e => set('mainPosition', e.target.value)} placeholder="ST, CM, GK..." />
               </Field>
-              <Field label="Goals Scored">
+              <Field label={t('players.goals')}>
                 <input type="number" className="input-field" value={form.goalsScored} onChange={e => set('goalsScored', e.target.value)} min="0" />
               </Field>
-              <Field label="Goals Saved (GK)">
+              <Field label={t('players.saves')}>
                 <input type="number" className="input-field" value={form.goalsSaved} onChange={e => set('goalsSaved', e.target.value)} min="0" />
               </Field>
-              <Field label="Assists">
+              <Field label={t('players.assists')}>
                 <input type="number" className="input-field" value={form.efbAssists} onChange={e => set('efbAssists', e.target.value)} min="0" />
               </Field>
-              <Field label="Shots on Target">
+              <Field label={t('players.shotsOnTarget')}>
                 <input type="number" className="input-field" value={form.shotsOnTarget} onChange={e => set('shotsOnTarget', e.target.value)} min="0" />
               </Field>
-              <Field label="Ball Recoveries">
+              <Field label={t('players.ballRecoveries')}>
                 <input type="number" className="input-field" value={form.ballRecoveries} onChange={e => set('ballRecoveries', e.target.value)} min="0" />
               </Field>
             </div>
@@ -640,41 +634,41 @@ export default function PlayerDetail() {
 
           {form.playerType === 'RACING' && (
             <div className="grid grid-cols-4 gap-3 pt-2 border-t border-bg-border">
-              <Field label="Avg Position">
+              <Field label={t('players.avgPosition')}>
                 <input type="number" step="0.1" className="input-field" value={form.avgPosition} onChange={e => set('avgPosition', e.target.value)} min="1" />
               </Field>
-              <Field label="Podiums">
+              <Field label={t('players.podiums')}>
                 <input type="number" className="input-field" value={form.podiums} onChange={e => set('podiums', e.target.value)} min="0" />
               </Field>
-              <Field label="Fastest Laps">
+              <Field label={t('players.fastestLaps')}>
                 <input type="number" className="input-field" value={form.fastestLaps} onChange={e => set('fastestLaps', e.target.value)} min="0" />
               </Field>
-              <Field label="DNFs">
+              <Field label={t('players.dnf')}>
                 <input type="number" className="input-field" value={form.dnf} onChange={e => set('dnf', e.target.value)} min="0" />
               </Field>
             </div>
           )}
           {form.playerType === 'BATTLE_ROYALE' && (
             <div className="grid grid-cols-4 gap-3 pt-2 border-t border-bg-border">
-              <Field label="Avg Placement">
+              <Field label={t('players.avgPlacement')}>
                 <input type="number" step="0.1" className="input-field" value={form.avgPlacement} onChange={e => set('avgPlacement', e.target.value)} min="1" />
               </Field>
-              <Field label="Total Kills">
+              <Field label={t('players.totalKills')}>
                 <input type="number" className="input-field" value={form.kills} onChange={e => set('kills', e.target.value)} min="0" />
               </Field>
-              <Field label="Top-10 Rate (%)">
+              <Field label={`${t('players.top10')} (%)`}>
                 <input type="number" step="0.1" className="input-field" value={form.top10Rate} onChange={e => set('top10Rate', e.target.value)} min="0" max="100" />
               </Field>
-              <Field label="Damage / Match">
+              <Field label={t('players.dmgPerMatch')}>
                 <input type="number" step="0.1" className="input-field" value={form.damagePerMatch} onChange={e => set('damagePerMatch', e.target.value)} min="0" />
               </Field>
             </div>
           )}
 
           <div className="flex gap-3 justify-end pt-1">
-            <button onClick={() => setModal(false)} className="btn-ghost">Cancel</button>
+            <button onClick={() => setModal(false)} className="btn-ghost">{t('common.cancel')}</button>
             <button onClick={handleSave} disabled={saving} className="btn-primary">
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? t('common.saving') : t('common.save')}
             </button>
           </div>
         </div>

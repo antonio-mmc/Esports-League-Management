@@ -1,6 +1,7 @@
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Plus, Trash2, Edit2, ChevronRight, Search, X } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useT } from '../context/LanguageContext'
 import PageHeader from '../components/PageHeader'
 import DataTable from '../components/DataTable'
 import Modal from '../components/Modal'
@@ -10,6 +11,7 @@ import { useToast } from '../components/Toast'
 import { teamApi } from '../services/api'
 import { teamEmoji } from '../utils/teamEmoji'
 import { winRate } from '../utils/stats'
+import { GAME_TITLES } from '../utils/gameMeta'
 
 const TYPE_META = {
   FPS:           { label: 'FPS',          color: 'cyan'   },
@@ -19,17 +21,7 @@ const TYPE_META = {
   BATTLE_ROYALE: { label: 'Battle Royale',color: 'red'    },
 }
 
-const COUNTRY_CODE = {
-  'Portugal': 'PT', 'Spain': 'ES', 'Japan': 'JP', 'Russia': 'RU',
-  'Ghana': 'GH', 'Denmark': 'DK', 'Sweden': 'SE', 'Italy': 'IT',
-  'Egypt': 'EG', 'France': 'FR', 'Brazil': 'BR', 'Germany': 'DE',
-  'South Korea': 'KR', 'Czech Republic': 'CZ', 'Senegal': 'SN',
-  'Ireland': 'IE', 'Croatia': 'HR', 'Lebanon': 'LB', 'Colombia': 'CO',
-  'Norway': 'NO', 'Pakistan': 'PK', 'USA': 'US',
-  'Mexico': 'MX', 'Morocco': 'MA', 'Netherlands': 'NL', 'Argentina': 'AR',
-  'India': 'IN', 'Nigeria': 'NG', 'Ukraine': 'UA', 'China': 'CN',
-  'Bangladesh': 'BD',
-}
+import { COUNTRY_CODE, flagEmoji } from '../utils/countries'
 
 function FlagIcon({ nationality, size = 15 }) {
   const code = COUNTRY_CODE[nationality]
@@ -46,9 +38,11 @@ function Field({ label, children }) {
   )
 }
 
-const emptyForm = { name: '', game: 'FPS', nationality: '', wins: 0, losses: 0, trophies: 0, city: '', foundedYear: '' }
+const emptyForm = { name: '', game: 'FPS', specificGame: 'Valorant', nationality: '', wins: 0, losses: 0, trophies: 0, city: '', foundedYear: '' }
 
 export default function Teams() {
+  const { t } = useT()
+  const navigate = useNavigate()
   const [teams, setTeams]   = useState([])
   const [loading, setLoad]  = useState(true)
   const [modal, setModal]   = useState(false)
@@ -74,14 +68,18 @@ export default function Teams() {
     try { setTeams((await teamApi.getAll()).data || []) }
     finally { setLoad(false) }
   }
+  // Intentional one-time fetch on mount; the loading flag set inside load() is expected.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load() }, [])
 
   const openCreate = () => { setEdit(null); setForm(emptyForm); setModal(true) }
   const openEdit   = (t) => {
     setEdit(t)
+    const game = t.game || 'FPS'
     setForm({
       name: t.name || '',
-      game: t.game || 'FPS',
+      game,
+      specificGame: t.specificGame || GAME_TITLES[game]?.[0] || '',
       nationality: t.nationality || '',
       wins: t.wins ?? 0,
       losses: t.losses ?? 0,
@@ -92,12 +90,16 @@ export default function Teams() {
     setModal(true)
   }
 
+  // Switching modality resets the title to the first one valid for it.
+  const setGame = (game) => setForm(f => ({ ...f, game, specificGame: GAME_TITLES[game]?.[0] || '' }))
+
   const handleSave = async () => {
     setSaving(true)
     try {
       const payload = {
         name: form.name,
         game: form.game,
+        specificGame: form.specificGame || null,
         nationality: form.nationality || null,
         wins: Number(form.wins),
         losses: Number(form.losses),
@@ -108,25 +110,25 @@ export default function Teams() {
       if (editing) await teamApi.update(editing.id, payload)
       else         await teamApi.create(payload)
       setModal(false)
-      toast(editing ? 'Team updated.' : 'Team created successfully.', 'success')
+      toast(editing ? t('teams.updated') : t('teams.created'), 'success')
       load()
-    } catch(e) { toast(e?.response?.data?.message || 'Failed to save.', 'error') }
+    } catch(e) { toast(e?.response?.data?.error || e?.response?.data?.message || t('teams.saveFail'), 'error') }
     finally { setSaving(false) }
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete team?')) return
+    if (!confirm(t('teams.confirmDelete'))) return
     try {
       await teamApi.delete(id)
-      toast('Team deleted.', 'info')
+      toast(t('teams.deleted'), 'info')
       load()
-    } catch(e) { toast(e?.response?.data?.message || 'Failed to delete.', 'error') }
+    } catch(e) { toast(e?.response?.data?.error || e?.response?.data?.message || t('teams.deleteFail'), 'error') }
   }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const gameOptions = [
-    { value: 'ALL',          label: 'All Games'     },
+    { value: 'ALL',          label: t('common.allGames') },
     { value: 'FPS',          label: 'FPS'           },
     { value: 'MOBA',         label: 'MOBA'          },
     { value: 'EFOOTBALL',    label: 'eFootball'     },
@@ -137,12 +139,8 @@ export default function Teams() {
   const natOptions = useMemo(() => {
     const nations = [...new Set(teams.map(t => t.nationality).filter(Boolean))].sort()
     return [
-      { value: '', label: 'All Nations' },
-      ...nations.map(n => {
-        const code = COUNTRY_CODE[n]
-        const flag = code ? code.toUpperCase().split('').map(c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)).join('') : ''
-        return { value: n, label: `${flag} ${n}`.trim() }
-      }),
+      { value: '', label: t('common.allNations') },
+      ...nations.map(n => ({ value: n, label: `${flagEmoji(n)} ${n}`.trim() })),
     ]
   }, [teams])
 
@@ -180,7 +178,7 @@ export default function Teams() {
   }, [teams, gameFilter, natFilter, nameSearch, coachSearch, sortKey, sortDir])
 
   const columns = [
-    { key: 'name', label: 'Team', sortable: true, render: (v, r) => (
+    { key: 'name', label: t('col.team'), sortable: true, render: (v, r) => (
       <div className="flex items-center gap-2.5">
         <div className="w-7 h-7 rounded-md bg-bg-primary flex items-center justify-center flex-shrink-0 text-base leading-none">
           {teamEmoji(v)}
@@ -191,10 +189,13 @@ export default function Teams() {
         </div>
       </div>
     )},
-    { key: 'game', label: 'Mode', sortable: true, render: (v) => {
+    { key: 'game', label: t('col.mode'), sortable: true, render: (v) => {
       const m = TYPE_META[v]
       return m ? <Badge variant={m.color}>{m.label}</Badge> : <span className="text-text-dim">—</span>
     }},
+    { key: 'specificGame', label: t('col.game'), sortable: true, render: v => v
+      ? <span className="font-body text-sm text-text-muted">{v}</span>
+      : <span className="text-text-dim">—</span> },
     { key: 'wins',   label: 'W', sortable: true, render: v => <span className="text-accent-green font-semibold">{v ?? 0}</span> },
     { key: 'losses', label: 'L', sortable: true, render: v => <span className="text-red-400 font-semibold">{v ?? 0}</span>      },
     { key: '_wr', label: 'WR', sortable: true, render: (_, r) => {
@@ -208,13 +209,13 @@ export default function Teams() {
         </span>
       )
     }},
-    { key: 'coach',   label: 'Coach',   sortable: true, render: v => v?.name || <span className="text-text-dim">—</span> },
-    { key: 'players', label: 'Players', sortable: true, render: v => <span className="text-text-muted">{v?.length ?? 0}</span> },
+    { key: 'coach',   label: t('col.coach'),   sortable: true, render: v => v?.name || <span className="text-text-dim">—</span> },
+    { key: 'players', label: t('col.players'), sortable: true, render: v => <span className="text-text-muted">{v?.length ?? 0}</span> },
     { key: '_actions', label: '', render: (_, r) => (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
         <Link to={`/teams/${r.id}`}
           className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-accent-green hover:bg-accent-green/10 transition-all duration-150 cursor-pointer"
-          title="View details">
+          title={t('ui.viewDetails')}>
           <ChevronRight size={13} />
         </Link>
         <button onClick={() => openEdit(r)} className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-accent-cyan hover:bg-accent-cyan/10 transition-all duration-150 cursor-pointer">
@@ -230,22 +231,22 @@ export default function Teams() {
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title="Teams"
-        subtitle={`${filtered.length} registered teams`}
+        title={t('nav.teams')}
+        subtitle={t('page.teamsSub', { n: filtered.length })}
         action={
           <button onClick={openCreate} className="btn-primary">
-            <Plus size={15} /> New Team
+            <Plus size={15} /> {t('page.newTeam')}
           </button>
         }
       />
 
       <div className="flex flex-wrap gap-3 mb-5">
-        <Combobox value={gameFilter} onChange={setGameFilter} options={gameOptions} placeholder="All Games"   style={{ width: 160 }} />
-        <Combobox value={natFilter}  onChange={setNatFilter}  options={natOptions}  placeholder="All Nations" style={{ width: 160 }} />
+        <Combobox value={gameFilter} onChange={setGameFilter} options={gameOptions} placeholder={t('common.allGames')}   style={{ width: 160 }} />
+        <Combobox value={natFilter}  onChange={setNatFilter}  options={natOptions}  placeholder={t('common.allNations')} style={{ width: 160 }} />
         <div className="flex items-center gap-2 flex-1 min-w-40 px-3 py-2 rounded-lg bg-bg-primary border border-bg-border focus-within:border-accent-green/40 transition-colors duration-150">
           <Search size={13} className="text-text-dim flex-shrink-0" />
           <input value={coachSearch} onChange={e => setCoachSearch(e.target.value)}
-            placeholder="Search coach..."
+            placeholder={t('teams.searchCoach')}
             className="bg-transparent font-body text-sm text-text-primary placeholder:text-text-dim outline-none flex-1 min-w-0" />
           {coachSearch && (
             <button onMouseDown={e => { e.preventDefault(); setCoachSearch('') }} className="text-text-dim hover:text-text-muted transition-colors cursor-pointer">
@@ -256,7 +257,7 @@ export default function Teams() {
         <div className="flex items-center gap-2 flex-1 min-w-40 px-3 py-2 rounded-lg bg-bg-primary border border-bg-border focus-within:border-accent-green/40 transition-colors duration-150">
           <Search size={13} className="text-text-dim flex-shrink-0" />
           <input value={nameSearch} onChange={e => setNameSearch(e.target.value)}
-            placeholder="Search team..."
+            placeholder={t('teams.searchTeam')}
             className="bg-transparent font-body text-sm text-text-primary placeholder:text-text-dim outline-none flex-1 min-w-0" />
           {nameSearch && (
             <button onMouseDown={e => { e.preventDefault(); setNameSearch('') }} className="text-text-dim hover:text-text-muted transition-colors cursor-pointer">
@@ -266,13 +267,13 @@ export default function Teams() {
         </div>
       </div>
 
-      <DataTable columns={columns} data={filtered} loading={loading} emptyMessage="No teams found." sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+      <DataTable columns={columns} data={filtered} loading={loading} emptyMessage={t('teams.none')} sortKey={sortKey} sortDir={sortDir} onSort={handleSort} onRowClick={(r) => navigate(`/teams/${r.id}`)} />
 
-      <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Team' : 'New Team'} width="max-w-xl">
+      <Modal open={modal} onClose={() => setModal(false)} title={editing ? t('teams.edit') : t('teams.new')} width="max-w-xl">
         <div className="space-y-4">
           <div className="flex gap-2">
             {Object.entries(TYPE_META).map(([type, meta]) => (
-              <button key={type} onClick={() => set('game', type)}
+              <button key={type} onClick={() => setGame(type)}
                 className={`flex-1 py-1.5 rounded-lg border font-body text-xs font-semibold transition-all duration-150 cursor-pointer ${
                   form.game === type
                     ? `border-accent-${meta.color} bg-accent-${meta.color}/10 text-accent-${meta.color}`
@@ -284,39 +285,49 @@ export default function Teams() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Team Name">
+            <Field label={t('col.name')}>
               <input className="input-field" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Team Alpha" />
             </Field>
-            <Field label="Nationality">
-              <input className="input-field" value={form.nationality} onChange={e => set('nationality', e.target.value)} placeholder="Portugal" />
+            <Field label={t('col.game')}>
+              <select className="input-field" value={form.specificGame} onChange={e => set('specificGame', e.target.value)}>
+                {(GAME_TITLES[form.game] || []).map(title => (
+                  <option key={title} value={title}>{title}</option>
+                ))}
+              </select>
             </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="City">
+            <Field label={t('col.nation')}>
+              <input className="input-field" value={form.nationality} onChange={e => set('nationality', e.target.value)} placeholder="Portugal" />
+            </Field>
+            <Field label={t('col.city')}>
               <input className="input-field" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Porto" />
             </Field>
-            <Field label="Founded Year">
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            <Field label={t('col.foundedYear')}>
               <input type="number" className="input-field" value={form.foundedYear} onChange={e => set('foundedYear', e.target.value)} placeholder="2022" min="1990" max="2030" />
             </Field>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Wins">
+            <Field label={t('players.wins')}>
               <input type="number" className="input-field" value={form.wins} onChange={e => set('wins', e.target.value)} min="0" />
             </Field>
-            <Field label="Losses">
+            <Field label={t('players.losses')}>
               <input type="number" className="input-field" value={form.losses} onChange={e => set('losses', e.target.value)} min="0" />
             </Field>
-            <Field label="Trophies">
+            <Field label={t('col.trophies')}>
               <input type="number" className="input-field" value={form.trophies} onChange={e => set('trophies', e.target.value)} min="0" />
             </Field>
           </div>
 
           <div className="flex gap-3 justify-end pt-1">
-            <button onClick={() => setModal(false)} className="btn-ghost">Cancel</button>
+            <button onClick={() => setModal(false)} className="btn-ghost">{t('common.cancel')}</button>
             <button onClick={handleSave} disabled={saving} className="btn-primary">
-              {saving ? 'Saving...' : editing ? 'Save' : 'Create'}
+              {saving ? t('common.saving') : editing ? t('common.save') : t('common.create')}
             </button>
           </div>
         </div>

@@ -21,8 +21,6 @@ public class Coach {
     @Column(nullable = false, unique = true)
     private String email;
 
-    private String password;
-
     private String nationality;
     private LocalDate birthDate;
     private String city;
@@ -40,10 +38,9 @@ public class Coach {
 
     public Coach() {}
 
-    public Coach(String name, String email, String password) {
+    public Coach(String name, String email) {
         this.name = name;
         this.email = email;
-        this.password = password;
     }
 
     // Getters and Setters
@@ -55,9 +52,6 @@ public class Coach {
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
-
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
 
     public String getNationality() { return nationality; }
     public void setNationality(String nationality) { this.nationality = nationality; }

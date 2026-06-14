@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from 'react'
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared constant colocated with its provider
 export const GAME_FILTERS = [
   { key: 'ALL',          label: 'General'      },
   { key: 'FPS',          label: 'FPS'          },
@@ -20,6 +21,7 @@ export function GameFilterProvider({ children }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook colocated with its provider
 export function useGameFilter() {
   return useContext(GameFilterContext)
 }

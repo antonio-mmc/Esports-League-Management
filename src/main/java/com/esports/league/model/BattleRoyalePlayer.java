@@ -14,10 +14,10 @@ public class BattleRoyalePlayer extends Player {
 
     public BattleRoyalePlayer() {}
 
-    public BattleRoyalePlayer(String fullName, String nickname, String password,
+    public BattleRoyalePlayer(String fullName, String nickname,
                                int matchesPlayed, int wins, int losses,
                                double avgPlacement, int kills, double top10Rate, double damagePerMatch) {
-        super(fullName, nickname, password, matchesPlayed, wins, losses);
+        super(fullName, nickname, matchesPlayed, wins, losses);
         this.avgPlacement = avgPlacement;
         this.kills = kills;
         this.top10Rate = top10Rate;

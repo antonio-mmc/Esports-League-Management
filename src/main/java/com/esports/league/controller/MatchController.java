@@ -29,16 +29,35 @@ public class MatchController {
 
     @PostMapping
     public ResponseEntity<Match> schedule(@RequestBody Map<String, Object> body) {
-        Long teamAId = Long.valueOf(body.get("teamAId").toString());
-        Long teamBId = Long.valueOf(body.get("teamBId").toString());
-        Long tournamentId = Long.valueOf(body.get("tournamentId").toString());
-        String date = body.get("date").toString();
+        Long teamAId = requiredId(body, "teamAId");
+        Long teamBId = requiredId(body, "teamBId");
+        Long tournamentId = requiredId(body, "tournamentId");
+        String date = required(body, "date").toString();
         return ResponseEntity.ok(matchService.schedule(teamAId, teamBId, tournamentId, date));
     }
 
     @PutMapping("/{id}/result")
     public ResponseEntity<Match> recordResult(@PathVariable Long id, @RequestBody Map<String, Integer> body) {
-        return ResponseEntity.ok(matchService.recordResult(id, body.get("scoreA"), body.get("scoreB")));
+        Integer scoreA = body.get("scoreA");
+        Integer scoreB = body.get("scoreB");
+        if (scoreA == null || scoreB == null) {
+            throw new IllegalArgumentException("Both scoreA and scoreB are required.");
+        }
+        return ResponseEntity.ok(matchService.recordResult(id, scoreA, scoreB));
+    }
+
+    private static Object required(Map<String, Object> body, String field) {
+        Object value = body.get(field);
+        if (value == null) throw new IllegalArgumentException("Missing required field: " + field);
+        return value;
+    }
+
+    private static Long requiredId(Map<String, Object> body, String field) {
+        try {
+            return Long.valueOf(required(body, field).toString());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Field " + field + " must be a numeric id.");
+        }
     }
 
     @DeleteMapping("/{id}")

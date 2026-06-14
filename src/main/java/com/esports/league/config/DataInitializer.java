@@ -2,6 +2,7 @@ package com.esports.league.config;
 
 import com.esports.league.model.*;
 import com.esports.league.repository.*;
+import com.esports.league.service.MarketValue;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,15 +21,17 @@ public class DataInitializer implements CommandLineRunner {
     private final CoachRepository coachRepo;
     private final TournamentRepository tournamentRepo;
     private final MatchRepository matchRepo;
+    private final TransferRepository transferRepo;
 
     public DataInitializer(TeamRepository teamRepo, PlayerRepository playerRepo,
                            CoachRepository coachRepo, TournamentRepository tournamentRepo,
-                           MatchRepository matchRepo) {
+                           MatchRepository matchRepo, TransferRepository transferRepo) {
         this.teamRepo = teamRepo;
         this.playerRepo = playerRepo;
         this.coachRepo = coachRepo;
         this.tournamentRepo = tournamentRepo;
         this.matchRepo = matchRepo;
+        this.transferRepo = transferRepo;
     }
 
     private static final Map<String, String[]> COACH_PROFILES = Map.ofEntries(
@@ -153,7 +156,14 @@ public class DataInitializer implements CommandLineRunner {
             boolean completedElimMissing0    = tournamentRepo.findAll().stream().noneMatch(t -> "COMPLETED".equals(t.getStatus()) && !"LEAGUE".equals(t.getFormat()));
             boolean prizesMissing0           = tournamentRepo.findAll().stream().noneMatch(t -> t.getPrizeFirst() != null);
             boolean expansionMissing         = teamRepo.findAll().stream().noneMatch(t -> "Crimson Vipers".equals(t.getName()));
-            if (!playersMissing && !tourneysMissing && !fpsMissing && !efbMissing && !racingMissing && !brMissing && !historyMissing && !moreUpcoming && !coachesMissing && !coachAchievementsMissing && !freeAgentsMissing && !teamDataMissing && !teamInfoMissing && !specificGameMissing && !eliminationMissing && !endDatesMissing0 && !groupStageMissing0 && !completedElimMissing0 && !prizesMissing0 && !expansionMissing) return;
+            boolean transfersMissing         = transferRepo.count() == 0;
+            boolean teamSpecificGameMissing  = teamRepo.findAll().stream().anyMatch(t -> t.getSpecificGame() == null);
+            boolean championMissing          = tournamentRepo.findAll().stream().anyMatch(t -> "COMPLETED".equals(t.getStatus()) && t.getChampionTeamName() == null);
+            boolean showcaseMissing          = teamRepo.findAll().stream().noneMatch(t -> "Sentinel Core".equals(t.getName()));
+            boolean leagueShowcaseMissing    = teamRepo.findAll().stream().noneMatch(t -> "Rift Guardians".equals(t.getName()));
+            boolean extraFreeAgentsMissing   = playerRepo.findAll().stream().noneMatch(p -> "tobiK".equals(p.getNickname()));
+            boolean activeLeagueMissing      = tournamentRepo.findAll().stream().noneMatch(t -> "Valorant Pro League 2026".equals(t.getName()));
+            if (!playersMissing && !tourneysMissing && !fpsMissing && !efbMissing && !racingMissing && !brMissing && !historyMissing && !moreUpcoming && !coachesMissing && !coachAchievementsMissing && !freeAgentsMissing && !teamDataMissing && !teamInfoMissing && !specificGameMissing && !eliminationMissing && !endDatesMissing0 && !groupStageMissing0 && !completedElimMissing0 && !prizesMissing0 && !expansionMissing && !transfersMissing && !teamSpecificGameMissing && !championMissing && !showcaseMissing && !leagueShowcaseMissing && !extraFreeAgentsMissing && !activeLeagueMissing) return;
 
             if (playersMissing) {
                 playerRepo.findAll().forEach(p -> {
@@ -224,7 +234,7 @@ public class DataInitializer implements CommandLineRunner {
 
             if (freeAgentsMissing) {
                 if (coachRepo.findAll().stream().noneMatch(c -> c.getTeam() == null)) {
-                    Coach freeCoach = new Coach("Tomás Ferreira", "t.ferreira@freeagent.gg", "password");
+                    Coach freeCoach = new Coach("Tomás Ferreira", "t.ferreira@freeagent.gg");
                     freeCoach.setNationality("Portugal");
                     freeCoach.setCity("Porto");
                     freeCoach.setBirthDate(LocalDate.of(1988, 9, 14));
@@ -233,7 +243,7 @@ public class DataInitializer implements CommandLineRunner {
                     coachRepo.save(freeCoach);
                 }
                 if (playerRepo.findAll().stream().noneMatch(p -> p.getTeam() == null)) {
-                    FPSPlayer freePlayer = new FPSPlayer("Lucas Petit", "lPetit", "password", 10, 6, 4, 72.5, 187, 73.8, 149.2);
+                    FPSPlayer freePlayer = new FPSPlayer("Lucas Petit", "lPetit", 10, 6, 4, 72.5, 187, 73.8, 149.2);
                     freePlayer.setNationality("France");
                     freePlayer.setCity("Lyon");
                     freePlayer.setBirthDate(LocalDate.of(2002, 3, 18));
@@ -335,6 +345,13 @@ public class DataInitializer implements CommandLineRunner {
             }
 
             if (expansionMissing) seedExpansion();
+            if (showcaseMissing) seedShowcase();   // needs the expansion teams (Crimson Vipers)
+            if (leagueShowcaseMissing) seedLeagueShowcase();   // needs the expansion MOBA teams
+            if (activeLeagueMissing) seedActiveLeague();        // needs the showcase Valorant teams
+            if (extraFreeAgentsMissing) seedFreeAgents();
+            if (transfersMissing) seedTransfers();
+            if (teamSpecificGameMissing) backfillTeamSpecificGame();
+            if (championMissing) backfillChampions();
 
             return;
         }
@@ -359,7 +376,7 @@ public class DataInitializer implements CommandLineRunner {
         ));
 
         // ── Free agent coach (no team) ────────────────────────────────────────
-        Coach freeCoach = new Coach("Tomás Ferreira", "t.ferreira@freeagent.gg", "password");
+        Coach freeCoach = new Coach("Tomás Ferreira", "t.ferreira@freeagent.gg");
         freeCoach.setNationality("Portugal");
         freeCoach.setCity("Porto");
         freeCoach.setBirthDate(LocalDate.of(1988, 9, 14));
@@ -389,7 +406,7 @@ public class DataInitializer implements CommandLineRunner {
         ));
 
         // ── Free agent player (no team) ───────────────────────────────────────
-        FPSPlayer freePlayer = new FPSPlayer("Lucas Petit", "lPetit", "password", 10, 6, 4, 72.5, 187, 73.8, 149.2);
+        FPSPlayer freePlayer = new FPSPlayer("Lucas Petit", "lPetit", 10, 6, 4, 72.5, 187, 73.8, 149.2);
         freePlayer.setNationality("France");
         freePlayer.setCity("Lyon");
         freePlayer.setBirthDate(LocalDate.of(2002, 3, 18));
@@ -451,6 +468,14 @@ public class DataInitializer implements CommandLineRunner {
         seedCompletedElimination();
         seedPrizes();
         seedExpansion();
+        seedShowcase();        // flagship 16-team Valorant single-elimination
+        seedLeagueShowcase();  // full 8-team League of Legends round-robin
+        seedActiveLeague();    // in-progress Valorant league: varied past + future fixtures
+        seedFreeAgents();      // deeper free-agency pool across all modalities
+        seedMoreUpcoming(); // so a fresh database matches one upgraded via the migration path
+        seedTransfers();
+        backfillTeamSpecificGame(); // derive each team's title from its tournaments
+        backfillChampions();        // name the winner of each completed tournament
     }
 
     // ── Racing seed ────────────────────────────────────────────────────────────
@@ -626,7 +651,7 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private Coach coach(String name, String email, Team team, String nationality, String city, String birthDate, String specialization) {
-        Coach c = new Coach(name, email, "password");
+        Coach c = new Coach(name, email);
         c.setTeam(team);
         team.setCoach(c);
         c.setNationality(nationality);
@@ -641,7 +666,7 @@ public class DataInitializer implements CommandLineRunner {
     private FPSPlayer fps(String fullName, String nick, Team team,
                           int mp, int w, int l, double accuracy, int headshots, double kast, double adr,
                           String nationality, String city, LocalDate birthDate) {
-        FPSPlayer p = new FPSPlayer(fullName, nick, "password", mp, w, l, accuracy, headshots, kast, adr);
+        FPSPlayer p = new FPSPlayer(fullName, nick, mp, w, l, accuracy, headshots, kast, adr);
         p.setTeam(team);
         p.setNationality(nationality);
         p.setCity(city);
@@ -653,7 +678,7 @@ public class DataInitializer implements CommandLineRunner {
                             int mp, int w, int l,
                             String character, int kills, int deaths, int assists,
                             String nationality, String city, LocalDate birthDate) {
-        MOBAPlayer p = new MOBAPlayer(fullName, nick, "password", mp, w, l, character, kills, deaths, assists);
+        MOBAPlayer p = new MOBAPlayer(fullName, nick, mp, w, l, character, kills, deaths, assists);
         p.setTeam(team);
         p.setNationality(nationality);
         p.setCity(city);
@@ -666,7 +691,7 @@ public class DataInitializer implements CommandLineRunner {
                                 String position, int goals, int saved, int assists,
                                 int shotsOnTarget, int ballRecoveries,
                                 String nationality, String city, LocalDate birthDate) {
-        EFootballPlayer p = new EFootballPlayer(fullName, nick, "password", mp, w, l, position, goals, saved, assists, shotsOnTarget, ballRecoveries);
+        EFootballPlayer p = new EFootballPlayer(fullName, nick, mp, w, l, position, goals, saved, assists, shotsOnTarget, ballRecoveries);
         p.setTeam(team);
         p.setNationality(nationality);
         p.setCity(city);
@@ -691,6 +716,66 @@ public class DataInitializer implements CommandLineRunner {
         if (endDate != null) t.setEndDate(LocalDate.parse(endDate));
         for (Team team : teams) t.getParticipatingTeams().add(team);
         return t;
+    }
+
+    /**
+     * Fills each team's {@code specificGame} from the tournaments it competes in:
+     * a team's title is the most common {@code specificGame} among its tournaments,
+     * falling back to the modality default when it has played in none.
+     */
+    private void backfillTeamSpecificGame() {
+        List<Tournament> tournaments = tournamentRepo.findAll();
+        teamRepo.findAll().forEach(team -> {
+            if (team.getSpecificGame() != null) return;
+            Map<String, Integer> tally = new HashMap<>();
+            for (Tournament t : tournaments) {
+                if (t.getSpecificGame() == null) continue;
+                boolean plays = t.getParticipatingTeams().stream()
+                    .anyMatch(pt -> pt.getId().equals(team.getId()));
+                if (plays) tally.merge(t.getSpecificGame(), 1, Integer::sum);
+            }
+            String title = tally.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElseGet(() -> inferSpecificGame(team.getName(), team.getGame()));
+            team.setSpecificGame(title);
+            teamRepo.save(team);
+        });
+    }
+
+    /**
+     * Names the standings winner of each already-completed tournament so the champion
+     * shows in the UI. Does not touch trophies — those are seeded manually.
+     */
+    private void backfillChampions() {
+        for (Tournament t : tournamentRepo.findAll()) {
+            if (!"COMPLETED".equals(t.getStatus()) || t.getChampionTeamName() != null) continue;
+            List<Match> played = matchRepo.findByTournamentId(t.getId()).stream()
+                .filter(Match::isResultRecorded).toList();
+            Team winner = null;
+            int bestPts = -1, bestDiff = Integer.MIN_VALUE;
+            for (Team team : t.getParticipatingTeams()) {
+                int w = 0, diff = 0;
+                for (Match m : played) {
+                    boolean isA = m.getTeamA().getId().equals(team.getId());
+                    boolean isB = m.getTeamB().getId().equals(team.getId());
+                    if (!isA && !isB) continue;
+                    int my  = isA ? m.getTeamAScore() : m.getTeamBScore();
+                    int opp = isA ? m.getTeamBScore() : m.getTeamAScore();
+                    diff += my - opp;
+                    if (my > opp) w++;
+                }
+                int pts = w * 3;
+                if (pts > bestPts || (pts == bestPts && diff > bestDiff)) {
+                    bestPts = pts; bestDiff = diff; winner = team;
+                }
+            }
+            if (winner != null) {
+                t.setChampionTeamId(winner.getId());
+                t.setChampionTeamName(winner.getName());
+                tournamentRepo.save(t);
+            }
+        }
     }
 
     private String inferSpecificGame(String name, String game) {
@@ -757,6 +842,263 @@ public class DataInitializer implements CommandLineRunner {
 
     private Match upcoming(Team a, Team b, String date, Tournament t) {
         return new Match(a, b, LocalDate.parse(date), t);
+    }
+
+    // ── Showcase seed (flagship 16-team tournament for the demo) ─────────────────
+    // A real-scale Valorant single-elimination: 16 teams, 15 matches across four rounds
+    // (Round of 16 → Quarter-Final → Semi-Final → Grand Final), fully played out to a
+    // champion. Twelve new teams are created alongside the four existing Valorant orgs so
+    // the bracket has varied, non-repeating match-ups — the kind of thing a real event
+    // looks like. Idempotent: keyed on one of the new teams, and it removes the earlier
+    // 4-team placeholder if a previous run left one behind.
+    private void seedShowcase() {
+        if (teamRepo.findAll().stream().anyMatch(x -> "Sentinel Core".equals(x.getName()))) return;
+
+        // Drop the small 4-team placeholder from an earlier version, if present (cascade
+        // removes its matches), so we don't end up with two "Valorant Masters" events.
+        tournamentRepo.findAll().stream()
+            .filter(x -> "Valorant Masters 2026".equals(x.getName()))
+            .forEach(tournamentRepo::delete);
+
+        Map<String, Team> tm = new HashMap<>();
+        teamRepo.findAll().forEach(x -> tm.put(x.getName(), x));
+        Team phantom = tm.get("Phantom Squad"), nexus = tm.get("Team Nexus"),
+             storm   = tm.get("Storm Raiders"), vipers = tm.get("Crimson Vipers");
+        if (phantom == null || nexus == null || storm == null || vipers == null) return;
+
+        // ── Twelve new Valorant teams (W/L mirrors their run in this bracket) ────────
+        Team sentinel = showcaseTeam("Sentinel Core",     "USA",          "Chicago",    2021, 1, 1);
+        Team radiant  = showcaseTeam("Radiant Union",     "Brazil",       "Curitiba",   2020, 1, 1);
+        Team spectre  = showcaseTeam("Spectre Division",  "South Korea",  "Incheon",    2022, 1, 1);
+        Team vandal   = showcaseTeam("Vandal Syndicate",  "Turkey",       "Istanbul",   2019, 2, 1);
+        Team eclipse  = showcaseTeam("Eclipse Vanguard",  "Canada",       "Vancouver",  2021, 1, 1);
+        Team ascend   = showcaseTeam("Ascend Collective", "Australia",    "Sydney",     2022, 0, 1);
+        Team nova     = showcaseTeam("Nova Tempest",      "Poland",       "Kraków",     2020, 0, 1);
+        Team phoenix  = showcaseTeam("Iron Phoenix",      "China",        "Shanghai",   2019, 0, 1);
+        Team astra    = showcaseTeam("Astra Legion",      "Argentina",    "Córdoba",    2021, 0, 1);
+        Team cipher   = showcaseTeam("Cipher Dynasty",    "Singapore",    "Singapore",  2022, 0, 1);
+        Team lotus    = showcaseTeam("Lotus Empire",      "India",        "Mumbai",     2020, 0, 1);
+        Team breach   = showcaseTeam("Breach Kings",      "England",      "Birmingham", 2019, 0, 1);
+        teamRepo.saveAll(List.of(sentinel, radiant, spectre, vandal, eclipse, ascend,
+                                 nova, phoenix, astra, cipher, lotus, breach));
+
+        Tournament t = tournament("Valorant Masters 2026", "FPS", "Valorant", "SINGLE_ELIMINATION",
+            "COMPLETED", "2026-05-22", "2026-05-31",
+            phantom, nexus, storm, vipers, sentinel, radiant, spectre, vandal,
+            eclipse, ascend, nova, phoenix, astra, cipher, lotus, breach);
+        t.setPrizeFirst("€100,000");
+        t.setPrizeSecond("€50,000");
+        t.setPrizeThird("€25,000");
+        // Crown the winner explicitly — the backfill flags are evaluated before this seed
+        // runs, so backfillChampions() may not pick up this freshly added tournament.
+        t.setChampionTeamId(phantom.getId());
+        t.setChampionTeamName(phantom.getName());
+        tournamentRepo.save(t);
+
+        // Matches are saved round by round (dates ascending) so the frontend bracket
+        // groups them correctly: 8 → 4 → 2 → 1. Phantom Squad lifts the trophy.
+        matchRepo.saveAll(List.of(
+            // Round of 16
+            played(phantom,  breach,   "2026-05-22", t, 13,  5),
+            played(sentinel, storm,    "2026-05-22", t, 13, 11),
+            played(vipers,   cipher,   "2026-05-23", t, 13,  8),
+            played(radiant,  nova,     "2026-05-23", t, 13,  9),
+            played(nexus,    lotus,    "2026-05-24", t, 13,  7),
+            played(spectre,  astra,    "2026-05-24", t, 13, 10),
+            played(vandal,   phoenix,  "2026-05-25", t, 13,  6),
+            played(eclipse,  ascend,   "2026-05-25", t, 13, 11),
+            // Quarter-Finals
+            played(phantom,  sentinel, "2026-05-27", t, 13,  9),
+            played(vipers,   radiant,  "2026-05-27", t, 13, 11),
+            played(nexus,    spectre,  "2026-05-28", t, 13,  8),
+            played(vandal,   eclipse,  "2026-05-28", t, 13, 10),
+            // Semi-Finals
+            played(phantom,  vipers,   "2026-05-30", t, 13, 10),
+            played(nexus,    vandal,   "2026-05-30", t, 13, 11),
+            // Grand Final
+            played(phantom,  nexus,    "2026-05-31", t, 13,  9)
+        ));
+    }
+
+    // Builds a roster-less Valorant org for the showcase bracket (pts = wins * 3).
+    private Team showcaseTeam(String name, String nationality, String city, int foundedYear, int wins, int losses) {
+        Team team = team(name, wins * 3, wins, losses);
+        team.setGame("FPS");
+        team.setSpecificGame("Valorant");
+        team.setNationality(nationality);
+        team.setCity(city);
+        team.setFoundedYear(foundedYear);
+        return team;
+    }
+
+    // ── League showcase seed (full round-robin in another discipline) ────────────
+    // A complete 8-team League of Legends regular season: every team plays every other
+    // once (28 matches), played out to a final standings table and a champion. Four new
+    // LoL orgs join the four existing MOBA teams. Idempotent: keyed on a new team.
+    private void seedLeagueShowcase() {
+        if (teamRepo.findAll().stream().anyMatch(x -> "Rift Guardians".equals(x.getName()))) return;
+
+        Map<String, Team> tm = new HashMap<>();
+        teamRepo.findAll().forEach(x -> tm.put(x.getName(), x));
+        Team frost = tm.get("Frost Giants"), echo = tm.get("Echo Strike"),
+             mystic = tm.get("Mystic Order"), iron = tm.get("Iron Wolves");
+        if (frost == null || echo == null || mystic == null || iron == null) return;
+
+        // Four new LoL orgs (W/L mirrors their finish in this league).
+        Team rift     = mobaShowcaseTeam("Rift Guardians",   "South Korea", "Gwangju",   2020, 5, 2);
+        Team hextech  = mobaShowcaseTeam("Hextech Vanguard", "China",       "Chengdu",   2021, 3, 4);
+        Team baron    = mobaShowcaseTeam("Baron Lords",      "USA",         "Seattle",   2022, 1, 6);
+        Team summoner = mobaShowcaseTeam("Summoner's Pride", "France",      "Marseille", 2021, 0, 7);
+        teamRepo.saveAll(List.of(rift, hextech, baron, summoner));
+
+        // Final order, strongest first — the higher-placed team wins each meeting, so the
+        // round-robin produces a clean ladder (Frost Giants take the title at 7-0).
+        List<Team> table = List.of(frost, echo, rift, mystic, hextech, iron, baron, summoner);
+
+        Tournament t = tournament("LoL Champions League 2026", "MOBA", "League of Legends", "LEAGUE",
+            "COMPLETED", "2026-05-01", "2026-05-31", table.toArray(new Team[0]));
+        t.setPrizeFirst("€80,000");
+        t.setPrizeSecond("€40,000");
+        t.setPrizeThird("€20,000");
+        t.setChampionTeamId(frost.getId());
+        t.setChampionTeamName(frost.getName());
+        tournamentRepo.save(t);
+
+        // Single round robin: each pair meets once (28 matches), scores varied for realism.
+        List<Match> matches = new ArrayList<>();
+        LocalDate date = LocalDate.parse("2026-05-02");
+        for (int i = 0; i < table.size(); i++) {
+            for (int j = i + 1; j < table.size(); j++) {
+                int winScore  = 22 + ((i * 3 + j) % 9);          // 22..30 kills
+                int loseScore = Math.max(8, winScore - (5 + ((i + j) % 5) * 3)); // trailing
+                matches.add(played(table.get(i), table.get(j), date.toString(), t, winScore, loseScore));
+                date = date.plusDays(1);
+            }
+        }
+        matchRepo.saveAll(matches);
+    }
+
+    // Builds a roster-less League of Legends org for the league showcase (pts = wins * 3).
+    private Team mobaShowcaseTeam(String name, String nationality, String city, int foundedYear, int wins, int losses) {
+        Team team = team(name, wins * 3, wins, losses);
+        team.setGame("MOBA");
+        team.setSpecificGame("League of Legends");
+        team.setNationality(nationality);
+        team.setCity(city);
+        team.setFoundedYear(foundedYear);
+        return team;
+    }
+
+    // ── Extra free agents (fuller transfer market across every discipline) ───────
+    // Players from all five modalities plus a few coaches, all without a team, so the
+    // Transfers page has a deep free-agency pool. Idempotent: keyed on one new player.
+    private void seedFreeAgents() {
+        if (playerRepo.findAll().stream().anyMatch(p -> "tobiK".equals(p.getNickname()))) return;
+
+        List<Player> agents = new ArrayList<>();
+        agents.add(freeAgent(new FPSPlayer("Tobias Krüger", "tobiK", 14, 9, 5, 70.1, 256, 73.4, 152.0),
+            "Germany", "Cologne", LocalDate.of(2001, 2, 11), "MVP — FPS Open Qualifier 2025"));
+        agents.add(freeAgent(new FPSPlayer("Aria Nazari", "ariaN", 11, 7, 4, 68.9, 201, 71.2, 144.5),
+            "Iran", "Tehran", LocalDate.of(2003, 6, 8), null));
+        agents.add(freeAgent(new MOBAPlayer("Min-jun Seo", "mjSeo", 13, 8, 5, "Akali", 84, 51, 60),
+            "South Korea", "Suwon", LocalDate.of(2002, 4, 19), "Rookie of the Split 2024"));
+        agents.add(freeAgent(new MOBAPlayer("Viktor Petrov", "vPetrov", 10, 5, 5, "Orianna", 47, 55, 88),
+            "Bulgaria", "Sofia", LocalDate.of(2001, 9, 23), null));
+        agents.add(freeAgent(new EFootballPlayer("Bruno Carvalho", "bCarva", 12, 8, 4, "ST", 19, 0, 9, 27, 11),
+            "Portugal", "Coimbra", LocalDate.of(2000, 12, 15), "Golden Boot — Regional eLeague 2025"));
+        agents.add(freeAgent(new EFootballPlayer("Noah Andersson", "noahA", 9, 5, 4, "CM", 6, 0, 12, 13, 18),
+            "Sweden", "Gothenburg", LocalDate.of(2002, 3, 27), null));
+        agents.add(freeAgent(new RacingPlayer("Lando Beckett", "landoB", 16, 6, 4, 4.2, 9, 7, 2),
+            "United Kingdom", "Norwich", LocalDate.of(2002, 7, 30), "Pole Position Record — Sim GP 2025"));
+        agents.add(freeAgent(new BattleRoyalePlayer("Sofia Marín", "sMarin", 18, 7, 5, 6.8, 142, 0.61, 410.0),
+            "Spain", "Valencia", LocalDate.of(2003, 3, 12), "Top Fragger — BR Showdown 2025"));
+        agents.add(freeAgent(new BattleRoyalePlayer("Dmitri Volkov", "dVolk", 15, 6, 6, 7.4, 121, 0.55, 372.0),
+            "Russia", "Kazan", LocalDate.of(2001, 11, 2), null));
+        playerRepo.saveAll(agents);
+
+        coachRepo.saveAll(List.of(
+            freeCoach("Helena Vásquez", "h.vasquez@freeagent.gg", "MOBA", "Mexico", "Guadalajara",
+                LocalDate.of(1985, 5, 20), "Head Coach — MOBA Spring Champions 2023"),
+            freeCoach("Andrei Popescu", "a.popescu@freeagent.gg", "EFOOTBALL", "Romania", "Bucharest",
+                LocalDate.of(1983, 8, 11), "eFootball Continental Cup 2022"),
+            freeCoach("Kenji Watanabe", "k.watanabe@freeagent.gg", "RACING", "Japan", "Yokohama",
+                LocalDate.of(1981, 12, 3), "Constructors' Title — Sim Racing League 2024")
+        ));
+    }
+
+    // Stamps profile fields onto a team-less player (an achievement is optional).
+    private Player freeAgent(Player p, String nationality, String city, LocalDate birthDate, String achievement) {
+        p.setNationality(nationality);
+        p.setCity(city);
+        p.setBirthDate(birthDate);
+        if (achievement != null) p.setAchievements(new ArrayList<>(List.of(achievement)));
+        return p;
+    }
+
+    private Coach freeCoach(String name, String email, String specialization, String nationality,
+                            String city, LocalDate birthDate, String achievement) {
+        Coach c = new Coach(name, email);
+        c.setSpecialization(specialization);
+        c.setNationality(nationality);
+        c.setCity(city);
+        c.setBirthDate(birthDate);
+        c.setAchievements(new ArrayList<>(List.of(achievement)));
+        return c;
+    }
+
+    // ── Active league seed (a season in progress, varied past AND future) ────────
+    // An 8-team Valorant round-robin played as a circle schedule: the first four rounds
+    // are already played and the last three are still scheduled. Because every team meets
+    // a different opponent each round, each one ends up with varied opponents in both its
+    // match history and its upcoming fixtures — no repetition. Idempotent (keyed on name).
+    private void seedActiveLeague() {
+        if (tournamentRepo.findAll().stream().anyMatch(t -> "Valorant Pro League 2026".equals(t.getName()))) return;
+
+        Map<String, Team> tm = new HashMap<>();
+        teamRepo.findAll().forEach(x -> tm.put(x.getName(), x));
+        List<Team> roster = new ArrayList<>();
+        for (String name : List.of("Phantom Squad", "Team Nexus", "Crimson Vipers", "Vandal Syndicate",
+                                   "Sentinel Core", "Spectre Division", "Radiant Union", "Eclipse Vanguard")) {
+            Team team = tm.get(name);
+            if (team == null) return;   // showcase teams not seeded yet
+            roster.add(team);
+        }
+
+        Tournament t = tournament("Valorant Pro League 2026", "FPS", "Valorant", "LEAGUE",
+            "ACTIVE", "2026-06-01", "2026-06-30", roster.toArray(new Team[0]));
+        t.setPrizeFirst("€60,000");
+        t.setPrizeSecond("€30,000");
+        t.setPrizeThird("€15,000");
+        tournamentRepo.save(t);
+
+        // Strength ranking (roster order) decides the winner of an already-played match.
+        Map<Long, Integer> rank = new HashMap<>();
+        for (int i = 0; i < roster.size(); i++) rank.put(roster.get(i).getId(), i);
+
+        int n = roster.size();          // 8 → 7 rounds of 4 matches (28 total)
+        int playedRounds = 4;           // 4 played + 3 upcoming per team
+        String[] playedDates   = { "2026-06-02", "2026-06-04", "2026-06-06", "2026-06-08" };
+        String[] upcomingDates = { "2026-06-18", "2026-06-21", "2026-06-24" };
+
+        List<Team> arr = new ArrayList<>(roster);
+        List<Match> matches = new ArrayList<>();
+        for (int round = 0; round < n - 1; round++) {
+            boolean isPlayed = round < playedRounds;
+            String date = isPlayed ? playedDates[round] : upcomingDates[round - playedRounds];
+            for (int i = 0; i < n / 2; i++) {
+                Team a = arr.get(i), b = arr.get(n - 1 - i);
+                if (isPlayed) {
+                    boolean aStronger = rank.get(a.getId()) <= rank.get(b.getId());
+                    Team winner = aStronger ? a : b, loser = aStronger ? b : a;
+                    matches.add(played(winner, loser, date, t, 13, 13 - (2 + ((round + i) % 6))));
+                } else {
+                    matches.add(upcoming(a, b, date, t));
+                }
+            }
+            // Circle method: keep the first team fixed, rotate the rest.
+            arr.add(1, arr.remove(n - 1));
+        }
+        matchRepo.saveAll(matches);
     }
 
     // ── Expansion seed (4 teams + 2 specific games per modality) ────────────────
@@ -1288,7 +1630,7 @@ public class DataInitializer implements CommandLineRunner {
                                 int mp, int w, int l,
                                 double avgPosition, int podiums, int fastestLaps, int dnf,
                                 String nationality, String city, LocalDate birthDate) {
-        RacingPlayer p = new RacingPlayer(fullName, nick, "password", mp, w, l, avgPosition, podiums, fastestLaps, dnf);
+        RacingPlayer p = new RacingPlayer(fullName, nick, mp, w, l, avgPosition, podiums, fastestLaps, dnf);
         p.setTeam(team);
         p.setNationality(nationality);
         p.setCity(city);
@@ -1300,7 +1642,7 @@ public class DataInitializer implements CommandLineRunner {
                                   int mp, int w, int l,
                                   double avgPlacement, int kills, double top10Rate, double damagePerMatch,
                                   String nationality, String city, LocalDate birthDate) {
-        BattleRoyalePlayer p = new BattleRoyalePlayer(fullName, nick, "password", mp, w, l, avgPlacement, kills, top10Rate, damagePerMatch);
+        BattleRoyalePlayer p = new BattleRoyalePlayer(fullName, nick, mp, w, l, avgPlacement, kills, top10Rate, damagePerMatch);
         p.setTeam(team);
         p.setNationality(nationality);
         p.setCity(city);
@@ -1343,5 +1685,47 @@ public class DataInitializer implements CommandLineRunner {
             if (prizes.length > 2 && prizes[2] != null) t.setPrizeThird(prizes[2]);
             tournamentRepo.save(t);
         });
+    }
+
+    // ── Transfer history seed ────────────────────────────────────────────────
+    // A handful of past roster moves so the dashboard transfer widget is populated.
+    // (null fromTeam = signed as a free agent; null toTeam = released to free agency)
+
+    private void seedTransfers() {
+        if (transferRepo.count() > 0) return;
+
+        Map<String, Player> pByNick = new HashMap<>();
+        playerRepo.findAll().forEach(p -> pByNick.put(p.getNickname(), p));
+        Map<String, Coach> cByName = new HashMap<>();
+        coachRepo.findAll().forEach(c -> cByName.put(c.getName(), c));
+
+        List<Transfer> ts = new ArrayList<>();
+        addPlayerTransfer(ts, pByNick, "svenL",      "Storm Raiders", "Phantom Squad", "2025-10-30");
+        addPlayerTransfer(ts, pByNick, "iBerg",      null,            "Apex Horizon",  "2025-11-20");
+        addPlayerTransfer(ts, pByNick, "jakeMorris", "Phantom Squad", "Storm Raiders", "2025-12-10");
+        addPlayerTransfer(ts, pByNick, "lBianchi",   "Iron Wolves",   "Echo Strike",   "2026-01-05");
+        addPlayerTransfer(ts, pByNick, "cMendes99",  "Storm Raiders", "Team Nexus",    "2026-01-20");
+        addPlayerTransfer(ts, pByNick, "hartXX",     "Velocity Grid", "Nitro Kings",   "2026-02-01");
+        addPlayerTransfer(ts, pByNick, "mjLee_zc",   "Drop Zone",     "Zone Control",  "2026-02-14");
+        addPlayerTransfer(ts, pByNick, "lPetit",     "Team Nexus",    null,            "2026-03-01");
+        addCoachTransfer (ts, cByName, "Jin Park",       null,         "Phantom Squad", "2025-09-15");
+        addCoachTransfer (ts, cByName, "Tomás Ferreira", "Team Nexus", null,            "2024-12-31");
+        addCoachTransfer (ts, cByName, "Lena Müller",    "Echo Strike", "Iron Wolves",  "2026-02-20");
+
+        transferRepo.saveAll(ts);
+    }
+
+    private void addPlayerTransfer(List<Transfer> out, Map<String, Player> byNick,
+                                   String nick, String from, String to, String date) {
+        Player p = byNick.get(nick);
+        if (p == null) return;
+        out.add(new Transfer("PLAYER", p.getId(), p.getNickname(), p.getPlayerType(), from, to, LocalDate.parse(date), MarketValue.of(p)));
+    }
+
+    private void addCoachTransfer(List<Transfer> out, Map<String, Coach> byName,
+                                  String name, String from, String to, String date) {
+        Coach c = byName.get(name);
+        if (c == null) return;
+        out.add(new Transfer("COACH", c.getId(), c.getName(), c.getSpecialization(), from, to, LocalDate.parse(date), MarketValue.of(c)));
     }
 }

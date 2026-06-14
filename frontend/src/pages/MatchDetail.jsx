@@ -9,6 +9,7 @@ import Badge from '../components/Badge'
 import { matchApi, teamApi } from '../services/api'
 import { teamEmoji } from '../utils/teamEmoji'
 import { winRate } from '../utils/stats'
+import { useT } from '../context/LanguageContext'
 
 // ── Modality meta ────────────────────────────────────────────────────────────
 const TYPE_META = {
@@ -90,7 +91,8 @@ function playerRole(p) {
 // ── Small pieces ─────────────────────────────────────────────────────────────
 
 function FormDots({ form }) {
-  if (!form.length) return <span className="font-body text-xs text-text-dim">No history</span>
+  const { t } = useT()
+  if (!form.length) return <span className="font-body text-xs text-text-dim">{t('dt.noHistory')}</span>
   return (
     <div className="flex items-center gap-1">
       {form.map((r, i) => (
@@ -150,6 +152,7 @@ function SectionTitle({ icon: Icon, children, color = '#06B6D4', count }) {
 // ── Line-up card ─────────────────────────────────────────────────────────────
 
 function Lineup({ team, accent, align = 'left' }) {
+  const { t } = useT()
   const meta = TYPE_META[team?.game] || {}
   const Icon = meta.icon || Users
   const players = team?.players || []
@@ -164,7 +167,7 @@ function Lineup({ team, accent, align = 'left' }) {
           {teamEmoji(team?.name)}
         </div>
         <div className={right ? 'items-end' : ''}>
-          <Link to={`/teams/${team?.id}`} className="font-display text-base text-text-primary hover:text-white transition-colors">{team?.name}</Link>
+          <Link to={`/teams/${team?.id}`} className="font-display text-base text-text-primary hover:text-accent-green transition-colors">{team?.name}</Link>
           <div className={`flex items-center gap-1.5 mt-0.5 ${right ? 'justify-end' : ''}`}>
             {meta.label && <Badge variant={meta.badge}>{meta.label}</Badge>}
           </div>
@@ -180,7 +183,7 @@ function Lineup({ team, accent, align = 'left' }) {
           </div>
           <div className={`min-w-0 flex-1 ${right ? 'text-right' : ''}`}>
             <p className="font-body text-xs font-semibold text-text-primary truncate">{coach.name}</p>
-            <p className="font-body text-[10px] text-text-dim uppercase tracking-wider">Head Coach</p>
+            <p className="font-body text-[10px] text-text-dim uppercase tracking-wider">{t('dt.headCoach')}</p>
           </div>
         </Link>
       )}
@@ -204,7 +207,7 @@ function Lineup({ team, accent, align = 'left' }) {
                     <Icon size={12} style={{ color: accent }} />
                   </div>
                   <div className={`min-w-0 flex-1 ${right ? 'text-right' : ''}`}>
-                    <p className="font-body text-sm font-semibold text-text-primary truncate group-hover:text-white transition-colors">{p.nickname}</p>
+                    <p className="font-body text-sm font-semibold text-text-primary truncate group-hover:text-accent-green transition-colors">{p.nickname}</p>
                     <p className="font-body text-[11px] text-text-dim truncate">{role || p.fullName}</p>
                   </div>
                   {headline && (
@@ -236,7 +239,7 @@ function HeroSide({ team, accent, record, isWinner, played }) {
           </div>
         )}
       </div>
-      <Link to={`/teams/${team?.id}`} className="font-display text-lg text-text-primary hover:text-white transition-colors leading-tight">{team?.name}</Link>
+      <Link to={`/teams/${team?.id}`} className="font-display text-lg text-text-primary hover:text-accent-green transition-colors leading-tight">{team?.name}</Link>
       <div className="flex items-center gap-2 font-body text-xs">
         <span className="text-accent-green font-semibold">{record.w}W</span>
         <span className="text-text-dim">·</span>
@@ -249,6 +252,7 @@ function HeroSide({ team, accent, record, isWinner, played }) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 export default function MatchDetail() {
+  const { t } = useT()
   const { id } = useParams()
   const [match, setMatch]       = useState(null)
   const [teamA, setTeamA]       = useState(null)
@@ -259,6 +263,7 @@ export default function MatchDetail() {
 
   useEffect(() => {
     let active = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional loading reset before fetch
     setLoad(true); setNotFound(false)
     matchApi.getById(id)
       .then(async (r) => {
@@ -335,8 +340,8 @@ export default function MatchDetail() {
   if (notFound || !match) {
     return (
       <div className="text-center py-32">
-        <p className="font-body text-text-muted">Match not found.</p>
-        <Link to="/matches" className="btn-ghost mt-4 inline-flex">Back to Matches</Link>
+        <p className="font-body text-text-muted">{t('mt.notFound')}</p>
+        <Link to="/matches" className="btn-ghost mt-4 inline-flex">{t('common.back', { target: t('nav.matches') })}</Link>
       </div>
     )
   }
@@ -346,7 +351,6 @@ export default function MatchDetail() {
   const gameMeta = TYPE_META[game] || {}
   const aWon     = played && match.teamAScore > match.teamBScore
   const bWon     = played && match.teamBScore > match.teamAScore
-  const draw     = played && match.teamAScore === match.teamBScore
   const recA     = recordFor(match.teamA?.id)
   const recB     = recordFor(match.teamB?.id)
 
@@ -359,7 +363,7 @@ export default function MatchDetail() {
     <div className="animate-fade-in">
       <Link to="/matches" className="inline-flex items-center gap-2 text-text-muted hover:text-text-primary font-body text-sm mb-6 transition-colors cursor-pointer group">
         <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
-        Back to Matches
+        {t('common.back', { target: t('nav.matches') })}
       </Link>
 
       {/* ── Hero / scoreboard ─────────────────────────────────────────────── */}
@@ -385,7 +389,7 @@ export default function MatchDetail() {
             <Calendar size={11} /> {fmtDate(match.date)}
           </span>
           {gameMeta.label && <Badge variant={gameMeta.badge}>{gameMeta.label}</Badge>}
-          <Badge variant={played ? (draw ? 'cyan' : 'green') : 'gray'}>{played ? (draw ? 'Draw' : 'Played') : 'Upcoming'}</Badge>
+          <Badge variant={played ? 'green' : 'gray'}>{played ? 'Played' : 'Upcoming'}</Badge>
         </div>
 
         {/* Teams + score */}
@@ -396,23 +400,21 @@ export default function MatchDetail() {
             {played ? (
               <>
                 <div className="flex items-center gap-3 font-display leading-none">
-                  <span className="text-5xl tabular-nums" style={{ color: aWon ? '#22C55E' : draw ? '#06B6D4' : '#64748B' }}>{match.teamAScore}</span>
+                  <span className="text-5xl tabular-nums" style={{ color: aWon ? '#22C55E' : '#64748B' }}>{match.teamAScore}</span>
                   <span className="text-2xl text-text-dim">:</span>
-                  <span className="text-5xl tabular-nums" style={{ color: bWon ? '#22C55E' : draw ? '#06B6D4' : '#64748B' }}>{match.teamBScore}</span>
+                  <span className="text-5xl tabular-nums" style={{ color: bWon ? '#22C55E' : '#64748B' }}>{match.teamBScore}</span>
                 </div>
-                <span className="font-body text-[10px] text-text-dim uppercase tracking-widest mt-2">Full Time</span>
-                {!draw && (
-                  <span className="font-body text-xs font-semibold mt-1" style={{ color: '#22C55E' }}>
-                    {aWon ? match.teamA?.name : match.teamB?.name} won
-                  </span>
-                )}
+                <span className="font-body text-[10px] text-text-dim uppercase tracking-widest mt-2">{t('dt.fullTime')}</span>
+                <span className="font-body text-xs font-semibold mt-1" style={{ color: '#22C55E' }}>
+                  {t('mt.won', { name: aWon ? match.teamA?.name : match.teamB?.name })}
+                </span>
               </>
             ) : (
               <>
                 <div className="w-12 h-12 rounded-full bg-bg-primary flex items-center justify-center" style={{ border: '1px solid rgba(100,116,139,0.3)' }}>
                   <Swords size={20} className="text-text-muted" />
                 </div>
-                <span className="font-body text-[10px] text-text-dim uppercase tracking-widest mt-2">Versus</span>
+                <span className="font-body text-[10px] text-text-dim uppercase tracking-widest mt-2">Versus</span>{/* universal */}
               </>
             )}
           </div>
@@ -424,7 +426,7 @@ export default function MatchDetail() {
       {/* ── Head-to-head + form ───────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="glass-card p-5">
-          <SectionTitle icon={History} color="#F59E0B">Head-to-Head</SectionTitle>
+          <SectionTitle icon={History} color="#F59E0B">{t('dt.headToHead')}</SectionTitle>
           {h2h.meetings.filter(m => m.resultRecorded).length === 0 ? (
             <p className="font-body text-sm text-text-dim text-center py-6">First-ever meeting.</p>
           ) : (
@@ -443,7 +445,7 @@ export default function MatchDetail() {
         </div>
 
         <div className="glass-card p-5">
-          <SectionTitle icon={Activity} color={ACCENT_A}>Recent Form</SectionTitle>
+          <SectionTitle icon={Activity} color={ACCENT_A}>{t('dt.recentForm')}</SectionTitle>
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <span className="font-body text-xs text-text-muted truncate flex-1">{match.teamA?.name}</span>
@@ -457,7 +459,7 @@ export default function MatchDetail() {
         </div>
 
         <div className="glass-card p-5">
-          <SectionTitle icon={Trophy} color="#22C55E">Season Record</SectionTitle>
+          <SectionTitle icon={Trophy} color="#22C55E">{t('dt.seasonRecord')}</SectionTitle>
           <div className="space-y-3">
             {[{ t: match.teamA, r: recA, a: ACCENT_A }, { t: match.teamB, r: recB, a: ACCENT_B }].map(({ t, r, a }) => {
               const wr = winRate(r.w, r.l)
@@ -493,8 +495,8 @@ export default function MatchDetail() {
       {showStats && (
         <div className="glass-card p-6 mb-6">
           <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-            <SectionTitle icon={Swords} color="#06B6D4">Team Comparison</SectionTitle>
-            <span className="font-body text-[10px] text-text-dim uppercase tracking-wider">Season aggregates</span>
+            <SectionTitle icon={Swords} color="#06B6D4">{t('dt.teamComparison')}</SectionTitle>
+            <span className="font-body text-[10px] text-text-dim uppercase tracking-wider">{t('dt.seasonAggregates')}</span>
           </div>
           <div className="flex items-center justify-between mb-3 px-1">
             <span className="font-body text-xs font-semibold truncate" style={{ color: ACCENT_A }}>{match.teamA?.name}</span>
@@ -513,7 +515,7 @@ export default function MatchDetail() {
       {/* ── Previous meetings list ────────────────────────────────────────── */}
       {h2h.meetings.length > 1 && (
         <div className="glass-card p-5">
-          <SectionTitle icon={History} color="#F59E0B" count={h2h.meetings.length}>Previous Meetings</SectionTitle>
+          <SectionTitle icon={History} color="#F59E0B" count={h2h.meetings.length}>{t('dt.prevMeetings')}</SectionTitle>
           <div className="space-y-1">
             {h2h.meetings.map(m => {
               const isThis = String(m.id) === String(match.id)

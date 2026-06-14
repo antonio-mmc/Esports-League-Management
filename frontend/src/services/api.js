@@ -7,9 +7,11 @@ const api = axios.create({
 })
 
 export const dashboardApi = {
-  getStats:        () => api.get('/dashboard/stats'),
-  getTopPlayers:   () => api.get('/dashboard/top-players'),
-  getGameBreakdown:() => api.get('/dashboard/game-breakdown'),
+  getStats:           () => api.get('/dashboard/stats'),
+  getTopPlayers:      () => api.get('/dashboard/top-players'),
+  getGameBreakdown:   () => api.get('/dashboard/game-breakdown'),
+  getFreeAgents:      () => api.get('/dashboard/free-agents'),
+  getRecentTransfers: () => api.get('/dashboard/recent-transfers'),
 }
 
 export const playerApi = {
@@ -47,6 +49,10 @@ export const tournamentApi = {
   create:       (data)  => api.post('/tournaments', data),
   update:       (id, d) => api.put(`/tournaments/${id}`, d),
   delete:       (id)    => api.delete(`/tournaments/${id}`),
+}
+
+export const transferApi = {
+  getAll: () => api.get('/transfers'),
 }
 
 export const matchApi = {

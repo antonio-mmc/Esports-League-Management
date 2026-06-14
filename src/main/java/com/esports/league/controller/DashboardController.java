@@ -2,6 +2,7 @@ package com.esports.league.controller;
 
 import com.esports.league.model.Player;
 import com.esports.league.repository.*;
+import com.esports.league.service.MarketValue;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -15,15 +16,17 @@ public class DashboardController {
     private final CoachRepository coachRepository;
     private final TournamentRepository tournamentRepository;
     private final MatchRepository matchRepository;
+    private final TransferRepository transferRepository;
 
     public DashboardController(TeamRepository teamRepository, PlayerRepository playerRepository,
                                CoachRepository coachRepository, TournamentRepository tournamentRepository,
-                               MatchRepository matchRepository) {
+                               MatchRepository matchRepository, TransferRepository transferRepository) {
         this.teamRepository = teamRepository;
         this.playerRepository = playerRepository;
         this.coachRepository = coachRepository;
         this.tournamentRepository = tournamentRepository;
         this.matchRepository = matchRepository;
+        this.transferRepository = transferRepository;
     }
 
     @GetMapping("/stats")
@@ -74,5 +77,44 @@ public class DashboardController {
         long generic      = all.stream().filter(p -> "GENERIC".equals(p.getPlayerType())).count();
         return Map.of("FPS", fps, "MOBA", moba, "EFOOTBALL", efootball,
                       "RACING", racing, "BATTLE_ROYALE", battleRoyale, "GENERIC", generic);
+    }
+
+    @GetMapping("/free-agents")
+    public Map<String, Object> getFreeAgents() {
+        List<Map<String, Object>> players = playerRepository.findAll().stream()
+            .filter(p -> p.getTeam() == null)
+            .map(p -> {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("id",          p.getId());
+                row.put("fullName",    p.getFullName());
+                row.put("nickname",    p.getNickname());
+                row.put("playerType",  p.getPlayerType());
+                row.put("nationality", p.getNationality());
+                row.put("value",       MarketValue.of(p));
+                return row;
+            }).toList();
+        List<Map<String, Object>> coaches = coachRepository.findAll().stream()
+            .filter(c -> c.getTeam() == null)
+            .map(c -> {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("id",             c.getId());
+                row.put("name",           c.getName());
+                row.put("specialization", c.getSpecialization());
+                row.put("nationality",    c.getNationality());
+                row.put("value",          MarketValue.of(c));
+                return row;
+            }).toList();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("players", players);
+        out.put("coaches", coaches);
+        return out;
+    }
+
+    @GetMapping("/recent-transfers")
+    public List<Map<String, Object>> getRecentTransfers() {
+        return transferRepository.findAllByOrderByDateDescIdDesc().stream()
+            .limit(12)
+            .map(TransferController::toRow)
+            .toList();
     }
 }
